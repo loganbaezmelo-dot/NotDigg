@@ -1,46 +1,47 @@
-// Target tech accounts to aggregate
-const ACCOUNTS = ["OpenAI", "AnthropicAI", "MistralAI"];
-
 async function loadFeed() {
   const container = document.getElementById("feed-list");
   if (!container) return;
 
-  container.innerHTML = `<p style="color: #9ca3af; text-align: center;">Aggregating live tweets without giving Elon $200... 💀</p>`;
+  container.innerHTML = `<p style="color: #9ca3af; text-align: center;">Fetching live tech top stories... 🚀</p>`;
 
   try {
-    // Fetch accounts in parallel
-    const requests = ACCOUNTS.map(user => 
-      fetch(`/api/tweets?username=${user}`).then(res => res.json())
+    // 1. Get Top 15 live Tech Stories from Hacker News Firebase API
+    const res = await fetch("https://hacker-news.firebaseio.com/v0/topstories.json");
+    const storyIds = await res.json();
+    const topIds = storyIds.slice(0, 15);
+
+    // 2. Fetch all story details concurrently
+    const storyPromises = topIds.map(id =>
+      fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`).then(r => r.json())
     );
-    
-    const results = await Promise.all(requests);
-    const allPosts = results
-      .flatMap(r => r.data || [])
-      .sort((a, b) => b.likes - a.likes); // Rank by likes
+    const stories = await Promise.all(storyPromises);
 
-    if (allPosts.length === 0) {
-      container.innerHTML = `<p style="color: #ef4444;">Rate limited or no posts found 😭</p>`;
-      return;
-    }
+    // 3. Render clean cards with WORKING user profile routes
+    container.innerHTML = stories
+      .filter(item => item && item.title)
+      .map((item, index) => {
+        const timeAgo = Math.floor((Date.now() / 1000 - item.time) / 3600);
+        const storyUrl = item.url || `https://news.ycombinator.com/item?id=${item.id}`;
 
-    container.innerHTML = allPosts.map((item, index) => `
-      <article class="card">
-        <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="card-title">
-          ${index + 1}. ${item.title}
-        </a>
-        <p class="card-snippet">${item.snippet}</p>
-        <div class="card-footer">
-          <span>
-            <a href="profile.html?user=${item.author}" class="meta-link">@${item.author}</a>
-            • ❤️ ${item.likes} • 🔁 ${item.retweets}
-          </span>
-          <a href="${item.url}" target="_blank" class="meta-link">View on X →</a>
-        </div>
-      </article>
-    `).join("");
+        return `
+          <article class="card">
+            <a href="${storyUrl}" target="_blank" rel="noopener noreferrer" class="card-title">
+              ${index + 1}. ${item.title}
+            </a>
+            <p class="card-snippet">Discussion with ${item.descendants || 0} comments and ${item.score} upvotes.</p>
+            <div class="card-footer">
+              <span>
+                Posted by <a href="profile.html?user=${item.by}" class="meta-link">@${item.by}</a> 
+                • ${timeAgo}h ago
+              </span>
+              <a href="https://news.ycombinator.com/item?id=${item.id}" target="_blank" class="meta-link">Comments (${item.descendants || 0}) →</a>
+            </div>
+          </article>
+        `;
+      }).join("");
 
   } catch (err) {
-    container.innerHTML = `<p style="color: #ef4444;">Failed to load live feed: ${err.message} 😭</p>`;
+    container.innerHTML = `<p style="color: #ef4444; text-align: center;">Failed to load live feed: ${err.message} 😭</p>`;
   }
 }
 
