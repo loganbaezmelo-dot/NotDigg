@@ -16,25 +16,25 @@ async function loadFeed() {
     );
     const stories = await Promise.all(storyPromises);
 
-    // 3. Render clean cards with WORKING user profile routes
+    // 3. Render clean cards with native internal routes
     container.innerHTML = stories
       .filter(item => item && item.title)
       .map((item, index) => {
         const timeAgo = Math.floor((Date.now() / 1000 - item.time) / 3600);
-        const storyUrl = item.url || `https://news.ycombinator.com/item?id=${item.id}`;
+        const storyUrl = item.url || `comments.html?id=${item.id}`;
 
         return `
           <article class="card">
             <a href="${storyUrl}" target="_blank" rel="noopener noreferrer" class="card-title">
               ${index + 1}. ${item.title}
             </a>
-            <p class="card-snippet">Discussion with ${item.descendants || 0} comments and ${item.score} upvotes.</p>
+            <p class="card-snippet">Discussion with ${item.descendants || 0} comments and ${item.score || 0} upvotes.</p>
             <div class="card-footer">
               <span>
                 Posted by <a href="profile.html?user=${item.by}" class="meta-link">@${item.by}</a> 
                 • ${timeAgo}h ago
               </span>
-              <a href="https://news.ycombinator.com/item?id=${item.id}" target="_blank" class="meta-link">Comments (${item.descendants || 0}) →</a>
+              <a href="comments.html?id=${item.id}" class="meta-link">Comments (${item.descendants || 0}) →</a>
             </div>
           </article>
         `;
