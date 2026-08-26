@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>User Profile | NotDigg</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header class="navbar">
+    <div class="nav-left">
+      <a href="index.html" class="logo">notdigg</a>
+    </div>
+    <div class="nav-right">
+      <a href="index.html" class="meta-link" style="color: white;">← Back to feed</a>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="card" style="margin-top: 20px; text-align: center; align-items: center;">
+      <div class="nav-avatar" style="width: 80px; height: 80px; margin-bottom: 10px;"></div>
+      <h1 id="username-display" style="font-size: 22px; font-weight: 700;">Loading...</h1>
+      <p class="card-snippet" style="margin-top: 6px;">Profile actually works and doesn't redirect to a random settings modal 💀</p>
+    </div>
+  </main>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const user = params.get('user') || 'Anonymous';
+    document.getElementById('username-display').textContent = '@' + user;
+  </script>
+</body>
+</html>
