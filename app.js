@@ -1,3 +1,23 @@
+// 1. Sidebar Drawer Toggle Handler
+function setupSidebar() {
+  const menuBtn = document.getElementById("menu-toggle");
+  const closeBtn = document.getElementById("close-drawer");
+  const backdrop = document.getElementById("drawer-backdrop");
+
+  function openDrawer() {
+    document.body.classList.add("drawer-open");
+  }
+
+  function closeDrawer() {
+    document.body.classList.remove("drawer-open");
+  }
+
+  if (menuBtn) menuBtn.addEventListener("click", openDrawer);
+  if (closeBtn) closeBtn.addEventListener("click", closeDrawer);
+  if (backdrop) backdrop.addEventListener("click", closeDrawer);
+}
+
+// 2. Feed Loader with HN Live Stories
 async function loadFeed() {
   const container = document.getElementById("feed-list");
   if (!container) return;
@@ -5,18 +25,15 @@ async function loadFeed() {
   container.innerHTML = `<p style="color: #9ca3af; text-align: center;">Fetching live tech top stories... 🚀</p>`;
 
   try {
-    // 1. Get Top 15 live Tech Stories from Hacker News Firebase API
     const res = await fetch("https://hacker-news.firebaseio.com/v0/topstories.json");
     const storyIds = await res.json();
     const topIds = storyIds.slice(0, 15);
 
-    // 2. Fetch all story details concurrently
     const storyPromises = topIds.map(id =>
       fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`).then(r => r.json())
     );
     const stories = await Promise.all(storyPromises);
 
-    // 3. Render clean cards with native internal routes
     container.innerHTML = stories
       .filter(item => item && item.title)
       .map((item, index) => {
@@ -45,4 +62,8 @@ async function loadFeed() {
   }
 }
 
-document.addEventListener("DOMContentLoaded", loadFeed);
+// Initialize on DOM Ready
+document.addEventListener("DOMContentLoaded", () => {
+  setupSidebar();
+  loadFeed();
+});
