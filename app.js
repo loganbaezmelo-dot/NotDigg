@@ -1,53 +1,47 @@
-// Sample feed data with functional profile and post links
-const stories = [
-  {
-    id: 1,
-    title: "Yutori Releases Navigator N2 Computer-Use Model",
-    snippet: "Model scores 65.2 percent on OSWorld 2.0 at low cost and leads multiple agent benchmarks.",
-    author: "yutorilabs",
-    postsCount: 11,
-    timeAgo: "6h ago",
-    url: "https://x.com/yutorilabs"
-  },
-  {
-    id: 2,
-    title: "Weaviate Podcast Features MIT Work on Recursive Language Models",
-    snippet: "Episode covers language model harnesses as compositional generalizers along with related MIT research.",
-    author: "weaviate_io",
-    postsCount: 3,
-    timeAgo: "9h ago",
-    url: "https://x.com/weaviate_io"
-  },
-  {
-    id: 3,
-    title: "Claude Models Optimize for Agent Communication Over Humans",
-    snippet: "Research deep dives into emergent protocols between multi-agent reasoning systems.",
-    author: "AnthropicAI",
-    postsCount: 7,
-    timeAgo: "13h ago",
-    url: "https://x.com/AnthropicAI"
-  }
-];
+// Target tech accounts to aggregate
+const ACCOUNTS = ["OpenAI", "AnthropicAI", "MistralAI"];
 
-function renderFeed() {
+async function loadFeed() {
   const container = document.getElementById("feed-list");
   if (!container) return;
 
-  container.innerHTML = stories.map((item, index) => `
-    <article class="card">
-      <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="card-title">
-        ${index + 1}. ${item.title}
-      </a>
-      <p class="card-snippet">${item.snippet}</p>
-      <div class="card-footer">
-        <span>
-          <a href="profile.html?user=${item.author}" class="meta-link">@${item.author}</a> 
-          • ${item.postsCount} posts
-        </span>
-        <span>${item.timeAgo}</span>
-      </div>
-    </article>
-  `).join("");
+  container.innerHTML = `<p style="color: #9ca3af; text-align: center;">Aggregating live tweets without giving Elon $200... 💀</p>`;
+
+  try {
+    // Fetch accounts in parallel
+    const requests = ACCOUNTS.map(user => 
+      fetch(`/api/tweets?username=${user}`).then(res => res.json())
+    );
+    
+    const results = await Promise.all(requests);
+    const allPosts = results
+      .flatMap(r => r.data || [])
+      .sort((a, b) => b.likes - a.likes); // Rank by likes
+
+    if (allPosts.length === 0) {
+      container.innerHTML = `<p style="color: #ef4444;">Rate limited or no posts found 😭</p>`;
+      return;
+    }
+
+    container.innerHTML = allPosts.map((item, index) => `
+      <article class="card">
+        <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="card-title">
+          ${index + 1}. ${item.title}
+        </a>
+        <p class="card-snippet">${item.snippet}</p>
+        <div class="card-footer">
+          <span>
+            <a href="profile.html?user=${item.author}" class="meta-link">@${item.author}</a>
+            • ❤️ ${item.likes} • 🔁 ${item.retweets}
+          </span>
+          <a href="${item.url}" target="_blank" class="meta-link">View on X →</a>
+        </div>
+      </article>
+    `).join("");
+
+  } catch (err) {
+    container.innerHTML = `<p style="color: #ef4444;">Failed to load live feed: ${err.message} 😭</p>`;
+  }
 }
 
-document.addEventListener("DOMContentLoaded", renderFeed);
+document.addEventListener("DOMContentLoaded", loadFeed);
