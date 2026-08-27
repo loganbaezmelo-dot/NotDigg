@@ -10,27 +10,39 @@ const supabaseClient = window.supabase
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
 
-// 2. Auth Handlers & Identity Linkers
+// 2. Auth Handlers & Identity Linkers (With YouTube Read Scope)
 async function loginWithGoogle() {
   if (!supabaseClient) return;
+
+  const options = {
+    redirectTo: window.location.origin + "/settings.html",
+    scopes: "https://www.googleapis.com/auth/youtube.readonly",
+    queryParams: {
+      access_type: 'offline',
+      prompt: 'consent'
+    }
+  };
+
   const { data: { session } } = await supabaseClient.auth.getSession();
   
   if (session && session.user) {
-    // User is ALREADY signed in -> Link Google/YouTube to existing account
+    // Attempt identity linking if user is already signed in
     const { error } = await supabaseClient.auth.linkIdentity({
       provider: "google",
-      options: {
-        redirectTo: window.location.origin + "/settings.html"
-      }
+      options: options
     });
-    if (error) alert("Google Link Error: " + error.message);
+    if (error) {
+      // Fallback if manual linking is disabled in project dashboard
+      await supabaseClient.auth.signInWithOAuth({
+        provider: "google",
+        options: options
+      });
+    }
   } else {
-    // Brand new sign in
+    // Direct sign in
     const { error } = await supabaseClient.auth.signInWithOAuth({
       provider: "google",
-      options: {
-        redirectTo: window.location.origin + "/settings.html"
-      }
+      options: options
     });
     if (error) alert("Google Sign-In Error: " + error.message);
   }
@@ -40,22 +52,25 @@ async function loginWithGitHub() {
   if (!supabaseClient) return;
   const { data: { session } } = await supabaseClient.auth.getSession();
 
+  const options = {
+    redirectTo: window.location.origin + "/settings.html"
+  };
+
   if (session && session.user) {
-    // User is ALREADY signed in -> Link GitHub to existing account
     const { error } = await supabaseClient.auth.linkIdentity({
       provider: "github",
-      options: {
-        redirectTo: window.location.origin + "/settings.html"
-      }
+      options: options
     });
-    if (error) alert("GitHub Link Error: " + error.message);
+    if (error) {
+      await supabaseClient.auth.signInWithOAuth({
+        provider: "github",
+        options: options
+      });
+    }
   } else {
-    // Brand new sign in
     const { error } = await supabaseClient.auth.signInWithOAuth({
       provider: "github",
-      options: {
-        redirectTo: window.location.origin + "/settings.html"
-      }
+      options: options
     });
     if (error) alert("GitHub OAuth Error: " + error.message);
   }
