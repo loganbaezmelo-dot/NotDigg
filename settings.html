@@ -79,23 +79,22 @@
 
       <!-- Manual Channel ID Link Option -->
       <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-color);">
-        <h4 style="font-size: 14px; margin: 0 0 8px 0;">Manual YouTube Channel Link</h4>
-        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Already have a Channel ID or custom handle? Link it directly:</p>
+        <h4 style="font-size: 14px; margin: 0 0 8px 0;">Link Specific Channel Handle or ID</h4>
+        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Specify your exact YouTube handle or channel ID:</p>
         <div style="display: flex; gap: 8px;">
-          <input type="text" id="manual-channel-input" class="auth-input" style="flex: 1; background: #121214; border: 1px solid var(--border-color); color: #fff; padding: 8px 12px; border-radius: 8px; font-size: 13px;" placeholder="e.g. UCxxxxxxxx or @ChannelHandle" />
-          <button id="save-channel-btn" class="action-btn">Link Channel</button>
+          <input type="text" id="manual-channel-input" class="auth-input" style="flex: 1; background: #121214; border: 1px solid var(--border-color); color: #fff; padding: 8px 12px; border-radius: 8px; font-size: 13px;" placeholder="e.g. @YourHandle or UCxxxxxxxx" />
+          <button id="save-channel-btn" class="action-btn">Save</button>
         </div>
         <p id="link-msg" style="font-size: 12px; margin-top: 6px;"></p>
       </div>
     </section>
 
-    <!-- Sign Out Area -->
     <div style="margin-top: 24px; text-align: center;">
       <button id="signout-btn" class="action-btn" style="color: #ef4444; border-color: #ef4444;">🚪 Sign Out of NotShovel</button>
     </div>
   </main>
 
-  <script src="app.js?v=13"></script>
+  <script src="app.js?v=14"></script>
   <script>
     async function initSettings() {
       const ytBtn = document.getElementById('connect-yt-btn');
@@ -105,28 +104,34 @@
       const manualInput = document.getElementById('manual-channel-input');
       const linkMsg = document.getElementById('link-msg');
 
-      let currentUser = localStorage.getItem('notshovel_auth_user');
       let linkedChannel = localStorage.getItem('notshovel_linked_channel');
 
       if (supabaseClient) {
         const { data: { session } } = await supabaseClient.auth.getSession();
         if (session && session.user) {
-          const provider = session.user.app_metadata.provider;
-          const meta = session.user.user_metadata || {};
+          const identities = session.user.identities || [];
+          
+          const hasGoogle = identities.some(id => id.provider === 'google');
+          const hasGithub = identities.some(id => id.provider === 'github');
 
-          if (provider === 'google') {
-            ytStatus.textContent = `Connected as ${session.user.email} ✅`;
-            ytBtn.textContent = "Re-connect";
-          } else if (provider === 'github') {
-            ghStatus.textContent = `Connected as @${meta.user_name || meta.preferred_username} ✅`;
-            ghBtn.textContent = "Re-connect";
+          if (hasGoogle) {
+            ytStatus.textContent = "Google Account Linked ✅";
+            ytBtn.textContent = "Connected ✅";
+            ytBtn.style.color = "#10b981";
+            ytBtn.style.borderColor = "#10b981";
+          }
+
+          if (hasGithub) {
+            ghStatus.textContent = "GitHub Account Linked ✅";
+            ghBtn.textContent = "Connected ✅";
+            ghBtn.style.color = "#10b981";
+            ghBtn.style.borderColor = "#10b981";
           }
         }
       }
 
       if (linkedChannel) {
         manualInput.value = linkedChannel;
-        ytStatus.textContent = `Linked channel: ${linkedChannel} ✅`;
       }
 
       ytBtn.onclick = () => loginWithGoogle();
@@ -137,7 +142,7 @@
         if (!val) return;
         localStorage.setItem('notshovel_linked_channel', val);
         linkMsg.style.color = "#10b981";
-        linkMsg.textContent = "YouTube channel linked to your profile! 📺✨";
+        linkMsg.textContent = "Channel linked! Check your unified profile 📺✨";
       };
 
       document.getElementById('signout-btn').onclick = async () => {
