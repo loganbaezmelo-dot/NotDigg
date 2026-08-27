@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings & Integrations | NotShovel</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    .settings-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px;
+      margin-top: 20px;
+    }
+    .integration-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 0;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .integration-row:last-child { border-bottom: none; }
+    .int-info { display: flex; align-items: center; gap: 14px; }
+    .int-icon { font-size: 26px; }
+  </style>
+</head>
+<body>
+
+  <header class="navbar">
+    <div class="nav-left">
+      <a href="index.html" class="logo">notshovel</a>
+    </div>
+    <div class="nav-right">
+      <a href="index.html" class="meta-link" style="color: white;">← Back to feed</a>
+    </div>
+  </header>
+
+  <main class="container">
+    <header class="feed-header" style="margin-top: 15px;">
+      <h1>Settings</h1>
+      <span class="badge">Account & Integrations</span>
+    </header>
+
+    <section class="settings-card">
+      <h2 style="font-size: 16px; font-weight: 700; margin: 0 0 12px 0;">Connected Integrations</h2>
+      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 18px;">
+        Connect platforms to merge your GitHub repositories and YouTube channel into one unified NotShovel profile.
+      </p>
+
+      <!-- Google / YouTube Integration -->
+      <div class="integration-row">
+        <div class="int-info">
+          <span class="int-icon">📺</span>
+          <div>
+            <h3 style="font-size: 15px; margin: 0; color: #fff;">Google & YouTube</h3>
+            <p id="yt-status-text" style="font-size: 12px; color: var(--text-muted); margin: 4px 0 0 0;">Not connected</p>
+          </div>
+        </div>
+        <button id="connect-yt-btn" class="action-btn" style="border-color: #ef4444; color: #f87171;">
+          Connect YouTube
+        </button>
+      </div>
+
+      <!-- GitHub Integration -->
+      <div class="integration-row">
+        <div class="int-info">
+          <span class="int-icon">🐙</span>
+          <div>
+            <h3 style="font-size: 15px; margin: 0; color: #fff;">GitHub</h3>
+            <p id="gh-status-text" style="font-size: 12px; color: var(--text-muted); margin: 4px 0 0 0;">Not connected</p>
+          </div>
+        </div>
+        <button id="connect-gh-btn" class="action-btn" style="border-color: #3b82f6; color: #60a5fa;">
+          Connect GitHub
+        </button>
+      </div>
+
+      <!-- Manual Channel ID Link Option -->
+      <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-color);">
+        <h4 style="font-size: 14px; margin: 0 0 8px 0;">Manual YouTube Channel Link</h4>
+        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Already have a Channel ID or custom handle? Link it directly:</p>
+        <div style="display: flex; gap: 8px;">
+          <input type="text" id="manual-channel-input" class="auth-input" style="flex: 1; background: #121214; border: 1px solid var(--border-color); color: #fff; padding: 8px 12px; border-radius: 8px; font-size: 13px;" placeholder="e.g. UCxxxxxxxx or @ChannelHandle" />
+          <button id="save-channel-btn" class="action-btn">Link Channel</button>
+        </div>
+        <p id="link-msg" style="font-size: 12px; margin-top: 6px;"></p>
+      </div>
+    </section>
+
+    <!-- Sign Out Area -->
+    <div style="margin-top: 24px; text-align: center;">
+      <button id="signout-btn" class="action-btn" style="color: #ef4444; border-color: #ef4444;">🚪 Sign Out of NotShovel</button>
+    </div>
+  </main>
+
+  <script src="app.js?v=13"></script>
+  <script>
+    async function initSettings() {
+      const ytBtn = document.getElementById('connect-yt-btn');
+      const ghBtn = document.getElementById('connect-gh-btn');
+      const ytStatus = document.getElementById('yt-status-text');
+      const ghStatus = document.getElementById('gh-status-text');
+      const manualInput = document.getElementById('manual-channel-input');
+      const linkMsg = document.getElementById('link-msg');
+
+      let currentUser = localStorage.getItem('notshovel_auth_user');
+      let linkedChannel = localStorage.getItem('notshovel_linked_channel');
+
+      if (supabaseClient) {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (session && session.user) {
+          const provider = session.user.app_metadata.provider;
+          const meta = session.user.user_metadata || {};
+
+          if (provider === 'google') {
+            ytStatus.textContent = `Connected as ${session.user.email} ✅`;
+            ytBtn.textContent = "Re-connect";
+          } else if (provider === 'github') {
+            ghStatus.textContent = `Connected as @${meta.user_name || meta.preferred_username} ✅`;
+            ghBtn.textContent = "Re-connect";
+          }
+        }
+      }
+
+      if (linkedChannel) {
+        manualInput.value = linkedChannel;
+        ytStatus.textContent = `Linked channel: ${linkedChannel} ✅`;
+      }
+
+      ytBtn.onclick = () => loginWithGoogle();
+      ghBtn.onclick = () => loginWithGitHub();
+
+      document.getElementById('save-channel-btn').onclick = () => {
+        const val = manualInput.value.trim();
+        if (!val) return;
+        localStorage.setItem('notshovel_linked_channel', val);
+        linkMsg.style.color = "#10b981";
+        linkMsg.textContent = "YouTube channel linked to your profile! 📺✨";
+      };
+
+      document.getElementById('signout-btn').onclick = async () => {
+        if (supabaseClient) await supabaseClient.auth.signOut();
+        localStorage.removeItem('notshovel_auth_user');
+        localStorage.removeItem('notshovel_linked_channel');
+        window.location.href = 'index.html';
+      };
+    }
+
+    document.addEventListener('DOMContentLoaded', initSettings);
+  </script>
+</body>
+</html>
