@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NotShovel | Tech Feed</title>
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
-  <!-- Top Navigation Bar -->
   <header class="navbar">
     <div class="nav-left">
       <button class="icon-btn" id="menu-toggle" aria-label="Toggle menu">☰</button>
@@ -16,13 +16,12 @@
     </div>
     
     <div class="nav-right">
-      <a href="profile.html?user=dang" class="profile-link" title="My Profile">
+      <a href="profile.html" class="profile-link" title="My Profile / Authenticate">
         <div class="nav-avatar"></div>
       </a>
     </div>
   </header>
 
-  <!-- Slide-out Sidebar Drawer & Overlay -->
   <div id="drawer-backdrop" class="drawer-backdrop"></div>
   <aside id="sidebar-drawer" class="sidebar-drawer">
     <div class="drawer-header">
@@ -32,7 +31,7 @@
     
     <nav class="drawer-links">
       <a href="index.html" class="drawer-link active">🔥 Top Tech Stories</a>
-      <a href="profile.html?user=dang" class="drawer-link">👤 Featured Profile</a>
+      <a href="profile.html" class="drawer-link profile-link">👤 My Profile / Login</a>
       <a href="https://github.com" target="_blank" rel="noopener noreferrer" class="drawer-link">⭐ View Source</a>
     </nav>
     
@@ -42,7 +41,6 @@
     </div>
   </aside>
 
-  <!-- Main Feed Container -->
   <main class="container">
     <header class="feed-header">
       <h1>Top Tech Stories</h1>
@@ -50,10 +48,9 @@
     </header>
 
     <section id="feed-list" class="feed-list">
-      <!-- Injected via app.js -->
-    </section>
+      </section>
   </main>
 
-  <script src="app.js?v=4"></script>
+  <script src="app.js?v=7"></script>
 </body>
 </html>
