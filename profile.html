@@ -3,10 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>User Profile | NotDigg</title>
+  <title>User Profile | NotShovel</title>
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    .profile-card {
+    .profile-card, .auth-card {
       background-color: var(--bg-card);
       border: 1px solid var(--border-color);
       border-radius: 12px;
@@ -17,11 +18,11 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
     }
-    .profile-avatar {
-      width: 76px;
-      height: 76px;
+    .profile-avatar-lg {
+      width: 80px;
+      height: 80px;
       border-radius: 50%;
       background: linear-gradient(135deg, #2563eb, #38bdf8);
       display: flex;
@@ -32,6 +33,8 @@
       color: #fff;
       text-transform: uppercase;
       box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+      background-size: cover;
+      background-position: center;
     }
     .stats-row {
       display: flex;
@@ -51,6 +54,48 @@
       max-width: 500px;
       word-break: break-word;
     }
+    .auth-input {
+      width: 100%;
+      max-width: 320px;
+      background: #121214;
+      border: 1px solid var(--border-color);
+      color: #fff;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 14px;
+      outline: none;
+    }
+    .auth-input:focus {
+      border-color: #3b82f6;
+    }
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      margin-top: 6px;
+    }
+    .action-btn {
+      background: var(--bg-card-hover);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.15s;
+    }
+    .action-btn:hover {
+      background: #27272a;
+    }
+    .action-btn.primary {
+      background: #2563eb;
+      border-color: #3b82f6;
+    }
+    .action-btn.primary:hover {
+      background: #1d4ed8;
+    }
     .section-title {
       font-size: 16px;
       font-weight: 700;
@@ -63,7 +108,7 @@
 
   <header class="navbar">
     <div class="nav-left">
-      <a href="index.html" class="logo">notdigg</a>
+      <a href="index.html" class="logo">notshovel</a>
     </div>
     <div class="nav-right">
       <a href="index.html" class="meta-link" style="color: white;">← Back to feed</a>
@@ -71,105 +116,214 @@
   </header>
 
   <main class="container">
-    <!-- User Profile Header -->
-    <section class="profile-card" id="profile-container">
-      <div class="profile-avatar" id="avatar-initial">?</div>
-      <h1 id="username" style="font-size: 22px; font-weight: 700;">Loading profile...</h1>
+    
+    <section class="profile-card" id="profile-container" style="display: none;">
+      <div class="profile-avatar-lg" id="avatar-display">?</div>
+      <h1 id="username" style="font-size: 22px; font-weight: 700;">Loading...</h1>
       
-      <div class="stats-row">
+      <div class="stats-row" id="stats-container">
         <span>Karma: <strong id="karma-count">--</strong></span>
         <span>Joined: <strong id="join-date">--</strong></span>
       </div>
 
       <div class="user-bio" id="user-about"></div>
+
+      <div class="btn-row" style="margin-top: 14px;">
+        <button id="switch-account-btn" class="action-btn">⚙️ Switch / Login</button>
+        <button id="logout-btn" class="action-btn" style="color: #ef4444;">🚪 Sign Out</button>
+      </div>
     </section>
 
-    <!-- Recent Submissions -->
-    <h2 class="section-title">Recent Submissions</h2>
-    <section id="user-posts" class="feed-list">
-      <p style="color: var(--text-muted); text-align: center;">Fetching submissions...</p>
+    <section class="auth-card" id="auth-box" style="display: none;">
+      <h2 style="font-size: 18px; font-weight: 700;">Authenticate with NotShovel</h2>
+      <p style="font-size: 13px; color: var(--text-muted);">Sign in with GitHub or your Email 🚀</p>
+
+      <button id="github-auth-btn" class="action-btn primary" style="width: 100%; max-width: 320px; padding: 10px;">
+        🐙 Sign In with GitHub
+      </button>
+
+      <div style="width: 100%; max-width: 320px; margin: 4px 0; border-bottom: 1px solid var(--border-color);"></div>
+
+      <input type="email" id="email-field" class="auth-input" placeholder="Enter your email" />
+      <input type="password" id="password-field" class="auth-input" placeholder="Password (Optional for Magic Link)" />
+
+      <div class="btn-row">
+        <button id="email-login-btn" class="action-btn">Sign In</button>
+        <button id="email-signup-btn" class="action-btn">Sign Up</button>
+        <button id="magiclink-btn" class="action-btn">✉️ Send Magic Link</button>
+      </div>
+
+      <p id="auth-status" style="font-size: 12px; margin-top: 6px;"></p>
     </section>
+
+    <div id="submissions-area" style="display: none;">
+      <h2 class="section-title">Recent Submissions</h2>
+      <section id="user-posts" class="feed-list">
+        <p style="color: var(--text-muted); text-align: center;">Fetching submissions...</p>
+      </section>
+    </div>
+
   </main>
 
+  <script src="app.js?v=7"></script>
   <script>
     const urlParams = new URLSearchParams(window.location.search);
-    const username = urlParams.get('user');
+    let targetUser = urlParams.get('user');
 
-    async function loadUserProfile() {
-      if (!username) {
-        document.getElementById('username').textContent = "No user found 😭";
-        return;
+    async function initProfilePage() {
+      const profileBox = document.getElementById('profile-container');
+      const authBox = document.getElementById('auth-box');
+      const subArea = document.getElementById('submissions-area');
+      const statusEl = document.getElementById('auth-status');
+
+      // Check current Supabase session
+      let sessionUser = null;
+      if (supabaseClient) {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (session && session.user) {
+          const meta = session.user.user_metadata || {};
+          sessionUser = meta.user_name || meta.preferred_username || session.user.email.split('@')[0];
+        }
       }
 
+      if (!targetUser) {
+        targetUser = sessionUser || localStorage.getItem('notshovel_auth_user');
+      }
+
+      // If user isn't authenticated and no query param, show Auth Form
+      if (!targetUser) {
+        authBox.style.display = "flex";
+        profileBox.style.display = "none";
+        subArea.style.display = "none";
+      } else {
+        authBox.style.display = "none";
+        profileBox.style.display = "flex";
+        subArea.style.display = "block";
+        loadUserDetails(targetUser);
+      }
+
+      // Button Listeners
+      document.getElementById('github-auth-btn').onclick = () => loginWithGitHub();
+
+      document.getElementById('email-login-btn').onclick = async () => {
+        const email = document.getElementById('email-field').value.trim();
+        const pwd = document.getElementById('password-field').value;
+        if (!email || !pwd) return alert("Please enter email & password");
+        try {
+          statusEl.style.color = "#9ca3af";
+          statusEl.textContent = "Logging in...";
+          await loginWithEmail(email, pwd);
+          window.location.reload();
+        } catch (err) {
+          statusEl.style.color = "#ef4444";
+          statusEl.textContent = err.message;
+        }
+      };
+
+      document.getElementById('email-signup-btn').onclick = async () => {
+        const email = document.getElementById('email-field').value.trim();
+        const pwd = document.getElementById('password-field').value;
+        if (!email || !pwd) return alert("Please enter email & password to sign up");
+        try {
+          statusEl.style.color = "#9ca3af";
+          statusEl.textContent = "Creating account...";
+          await signUpWithEmail(email, pwd);
+          statusEl.style.color = "#10b981";
+          statusEl.textContent = "Check your email inbox to confirm registration! 🚀";
+        } catch (err) {
+          statusEl.style.color = "#ef4444";
+          statusEl.textContent = err.message;
+        }
+      };
+
+      document.getElementById('magiclink-btn').onclick = async () => {
+        const email = document.getElementById('email-field').value.trim();
+        if (!email) return alert("Please enter your email for Magic Link");
+        try {
+          statusEl.style.color = "#9ca3af";
+          statusEl.textContent = "Sending Magic Link...";
+          await sendMagicLink(email);
+          statusEl.style.color = "#10b981";
+          statusEl.textContent = "Magic login link sent to your email! ✉️";
+        } catch (err) {
+          statusEl.style.color = "#ef4444";
+          statusEl.textContent = err.message;
+        }
+      };
+
+      document.getElementById('switch-account-btn').onclick = () => {
+        authBox.style.display = "flex";
+      };
+
+      document.getElementById('logout-btn').onclick = async () => {
+        if (supabaseClient) await supabaseClient.auth.signOut();
+        localStorage.removeItem('notshovel_auth_user');
+        window.location.href = 'index.html';
+      };
+    }
+
+    async function loadUserDetails(userHandle) {
       try {
-        // 1. Fetch user data
-        const res = await fetch(`https://hacker-news.firebaseio.com/v0/user/${username}.json`);
+        const res = await fetch(`https://hacker-news.firebaseio.com/v0/user/${userHandle}.json`);
         const user = await res.json();
+        const avatarEl = document.getElementById('avatar-display');
 
-        if (!user) {
-          document.getElementById('username').textContent = `@${username} (Not found)`;
-          return;
-        }
+        document.getElementById('username').textContent = `@${userHandle}`;
 
-        // 2. Populate profile details
-        document.getElementById('avatar-initial').textContent = user.id.slice(0, 2);
-        document.getElementById('username').textContent = `@${user.id}`;
-        document.getElementById('karma-count').textContent = Number(user.karma || 0).toLocaleString();
-        
-        const joinDate = new Date(user.created * 1000).toLocaleDateString(undefined, {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric'
-        });
-        document.getElementById('join-date').textContent = joinDate;
-
-        if (user.about) {
-          document.getElementById('user-about').innerHTML = user.about;
+        if (user) {
+          avatarEl.textContent = userHandle.slice(0, 2).toUpperCase();
+          document.getElementById('karma-count').textContent = Number(user.karma || 0).toLocaleString();
+          document.getElementById('join-date').textContent = new Date(user.created * 1000).toLocaleDateString();
+          document.getElementById('user-about').innerHTML = user.about || "No bio written.";
+          loadUserPosts(user.submitted || []);
         } else {
-          document.getElementById('user-about').textContent = "No bio written.";
+          avatarEl.textContent = userHandle.slice(0, 2).toUpperCase();
+          document.getElementById('karma-count').textContent = "N/A";
+          document.getElementById('join-date').textContent = "Authenticated";
+          document.getElementById('user-about').textContent = "Logged into NotShovel via Supabase Auth.";
+          document.getElementById('user-posts').innerHTML = `<p style="color: var(--text-muted); text-align: center;">No HN submissions found for @${userHandle}.</p>`;
         }
-
-        // 3. Fetch latest submissions
-        const postsContainer = document.getElementById('user-posts');
-        const submittedIds = (user.submitted || []).slice(0, 8);
-
-        if (submittedIds.length === 0) {
-          postsContainer.innerHTML = `<p style="color: var(--text-muted); text-align: center;">No recent submissions found.</p>`;
-          return;
-        }
-
-        const itemFetches = submittedIds.map(id =>
-          fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`).then(r => r.json())
-        );
-        const items = await Promise.all(itemFetches);
-
-        // Filter for stories and comments
-        postsContainer.innerHTML = items
-          .filter(item => item && !item.deleted && !item.dead)
-          .map(item => {
-            const isStory = item.type === 'story';
-            const title = item.title || (item.text ? item.text.slice(0, 90) + '...' : 'Untitled Post');
-            const targetUrl = isStory && item.url ? item.url : `comments.html?id=${item.id}`;
-
-            return `
-              <article class="card">
-                <a href="${targetUrl}" target="_blank" rel="noopener noreferrer" class="card-title">
-                  ${title}
-                </a>
-                <div class="card-footer">
-                  <span>${item.type.toUpperCase()} • ${item.score || 0} pts</span>
-                  <a href="comments.html?id=${item.id}" class="meta-link">View Discussion →</a>
-                </div>
-              </article>
-            `;
-          }).join('');
-
       } catch (err) {
-        document.getElementById('username').textContent = "Failed to load user 😭💀";
+        document.getElementById('username').textContent = `@${userHandle}`;
       }
     }
 
-    document.addEventListener('DOMContentLoaded', loadUserProfile);
+    async function loadUserPosts(submittedIds) {
+      const postsContainer = document.getElementById('user-posts');
+      const sliceIds = submittedIds.slice(0, 8);
+
+      if (sliceIds.length === 0) {
+        postsContainer.innerHTML = `<p style="color: var(--text-muted); text-align: center;">No recent submissions found.</p>`;
+        return;
+      }
+
+      const itemFetches = sliceIds.map(id =>
+        fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`).then(r => r.json())
+      );
+      const items = await Promise.all(itemFetches);
+
+      postsContainer.innerHTML = items
+        .filter(item => item && !item.deleted && !item.dead)
+        .map(item => {
+          const isStory = item.type === 'story';
+          const title = item.title || (item.text ? item.text.slice(0, 90) + '...' : 'Untitled Post');
+          const targetUrl = isStory && item.url ? item.url : `comments.html?id=${item.id}`;
+
+          return `
+            <article class="card">
+              <a href="${targetUrl}" target="_blank" rel="noopener noreferrer" class="card-title">
+                ${title}
+              </a>
+              <div class="card-footer">
+                <span>${item.type.toUpperCase()} • ${item.score || 0} pts</span>
+                <a href="comments.html?id=${item.id}" class="meta-link">View Discussion →</a>
+              </div>
+            </article>
+          `;
+        }).join('');
+    }
+
+    document.addEventListener('DOMContentLoaded', initProfilePage);
   </script>
 </body>
 </html>
