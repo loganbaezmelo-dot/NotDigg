@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    .profile-card, .auth-card {
+    .profile-card {
       background-color: var(--bg-card);
       border: 1px solid var(--border-color);
       border-radius: 12px;
@@ -24,7 +24,7 @@
       width: 80px;
       height: 80px;
       border-radius: 50%;
-      background: linear-gradient(135deg, #2563eb, #38bdf8);
+      background: linear-gradient(135deg, #2563eb, #ef4444);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -38,68 +38,26 @@
     }
     .stats-row {
       display: flex;
-      gap: 20px;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 16px;
       margin-top: 8px;
       font-size: 13px;
       color: var(--text-muted);
     }
-    .stats-row strong {
-      color: var(--text-main);
-    }
+    .stats-row strong { color: var(--text-main); }
     .user-bio {
-      margin-top: 10px;
+      margin-top: 8px;
       font-size: 13.5px;
       color: #d1d5db;
       line-height: 1.6;
       max-width: 500px;
       word-break: break-word;
     }
-    .auth-input {
-      width: 100%;
-      max-width: 320px;
-      background: #121214;
-      border: 1px solid var(--border-color);
-      color: #fff;
-      padding: 10px 14px;
-      border-radius: 8px;
-      font-size: 14px;
-      outline: none;
-    }
-    .auth-input:focus {
-      border-color: #3b82f6;
-    }
-    .btn-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      justify-content: center;
-      margin-top: 6px;
-    }
-    .action-btn {
-      background: var(--bg-card-hover);
-      color: var(--text-main);
-      border: 1px solid var(--border-color);
-      padding: 8px 14px;
-      border-radius: 8px;
-      font-size: 13px;
-      cursor: pointer;
-      font-weight: 500;
-      transition: background 0.15s;
-    }
-    .action-btn:hover {
-      background: #27272a;
-    }
-    .action-btn.primary {
-      background: #2563eb;
-      border-color: #3b82f6;
-    }
-    .action-btn.primary:hover {
-      background: #1d4ed8;
-    }
     .section-title {
       font-size: 16px;
       font-weight: 700;
-      margin-top: 24px;
+      margin-top: 26px;
       margin-bottom: 12px;
       color: var(--text-main);
     }
@@ -111,84 +69,59 @@
     <div class="nav-left">
       <a href="index.html" class="logo">notshovel</a>
     </div>
-    <div class="nav-right">
-      <a href="index.html" class="meta-link" style="color: white;">← Back to feed</a>
+    <div class="nav-right" style="display: flex; gap: 12px; align-items: center;">
+      <a href="settings.html" class="meta-link" style="color: white;">⚙️ Settings</a>
+      <a href="index.html" class="meta-link" style="color: white;">← Back</a>
     </div>
   </header>
 
   <main class="container">
     
-    <!-- Profile Card -->
-    <section class="profile-card" id="profile-container" style="display: none;">
+    <!-- Unified Profile Header Card -->
+    <section class="profile-card" id="profile-container">
       <div class="profile-avatar-lg" id="avatar-display">?</div>
-      <h1 id="username" style="font-size: 22px; font-weight: 700;">Loading profile...</h1>
+      <h1 id="username" style="font-size: 22px; font-weight: 700; margin: 0;">Loading profile...</h1>
       
       <div class="stats-row" id="stats-container">
-        <span><span id="stat-label-1">Stats</span>: <strong id="karma-count">--</strong></span>
-        <span>Joined: <strong id="join-date">--</strong></span>
+        <span>GitHub: <strong id="karma-count">--</strong></span>
+        <span>YouTube: <strong id="yt-sub-count">--</strong></span>
       </div>
 
       <div class="user-bio" id="user-about"></div>
 
-      <div class="btn-row" style="margin-top: 14px;">
-        <button id="switch-account-btn" class="action-btn">⚙️ Switch / Login</button>
-        <button id="logout-btn" class="action-btn" style="color: #ef4444;">🚪 Sign Out</button>
+      <div style="display: flex; gap: 8px; margin-top: 10px;">
+        <a href="settings.html" class="action-btn" style="font-size: 12px;">⚙️ Manage Integrations</a>
       </div>
     </section>
 
-    <!-- Email & OAuth Login Card -->
-    <section class="auth-card" id="auth-box" style="display: none;">
-      <h2 style="font-size: 18px; font-weight: 700;">Authenticate with NotShovel</h2>
-      <p style="font-size: 13px; color: var(--text-muted);">Sign in with GitHub or your Email 🚀</p>
+    <!-- 1. Merged YouTube Channel Section -->
+    <div id="youtube-section-wrapper" style="display: none;">
+      <h2 class="section-title" style="color: #f87171;">📺 Linked YouTube Channel</h2>
+      <section id="user-youtube-videos" class="feed-list"></section>
+    </div>
 
-      <button id="github-auth-btn" class="action-btn primary" style="width: 100%; max-width: 320px; padding: 10px;">
-        🐙 Sign In with GitHub
-      </button>
+    <!-- 2. GitHub Repos Section -->
+    <div id="github-repos-wrapper" style="display: none;">
+      <h2 class="section-title" style="color: #60a5fa;">📦 GitHub Repositories</h2>
+      <section id="github-repos" class="feed-list"></section>
+    </div>
 
-      <div style="width: 100%; max-width: 320px; margin: 4px 0; border-bottom: 1px solid var(--border-color);"></div>
-
-      <input type="email" id="email-field" class="auth-input" placeholder="Enter your email" />
-      <input type="password" id="password-field" class="auth-input" placeholder="Password (Optional for Magic Link)" />
-
-      <div class="btn-row">
-        <button id="email-login-btn" class="action-btn">Sign In</button>
-        <button id="email-signup-btn" class="action-btn">Sign Up</button>
-        <button id="magiclink-btn" class="action-btn">✉️ Send Magic Link</button>
-      </div>
-
-      <p id="auth-status" style="font-size: 12px; margin-top: 6px;"></p>
-    </section>
-
-    <!-- Content Sections Area -->
-    <div id="submissions-area" style="display: none;">
-      
-      <!-- Submissions Section -->
-      <h2 class="section-title" id="hn-section-title">Community Submissions</h2>
+    <!-- 3. Community Submissions Section -->
+    <div id="submissions-wrapper">
+      <h2 class="section-title">💬 Community Activity</h2>
       <section id="user-posts" class="feed-list">
         <p style="color: var(--text-muted); text-align: center;">Fetching submissions...</p>
       </section>
-
-      <!-- GitHub Repos Section -->
-      <div id="github-repos-wrapper" style="display: none;">
-        <h2 class="section-title">GitHub Repositories</h2>
-        <section id="github-repos" class="feed-list"></section>
-      </div>
-
     </div>
 
   </main>
 
-  <script src="app.js?v=11"></script>
+  <script src="app.js?v=13"></script>
   <script>
     const urlParams = new URLSearchParams(window.location.search);
     let targetUser = urlParams.get('user');
 
     async function initProfilePage() {
-      const profileBox = document.getElementById('profile-container');
-      const authBox = document.getElementById('auth-box');
-      const subArea = document.getElementById('submissions-area');
-      const statusEl = document.getElementById('auth-status');
-
       let sessionUser = null;
       if (supabaseClient) {
         const { data: { session } } = await supabaseClient.auth.getSession();
@@ -203,107 +136,37 @@
       }
 
       if (!targetUser) {
-        authBox.style.display = "flex";
-        profileBox.style.display = "none";
-        subArea.style.display = "none";
-      } else {
-        authBox.style.display = "none";
-        profileBox.style.display = "flex";
-        subArea.style.display = "block";
-        loadUserDetails(targetUser);
+        window.location.href = "login.html";
+        return;
       }
 
-      document.getElementById('github-auth-btn').onclick = () => loginWithGitHub();
-
-      document.getElementById('email-login-btn').onclick = async () => {
-        const email = document.getElementById('email-field').value.trim();
-        const pwd = document.getElementById('password-field').value;
-        if (!email || !pwd) return alert("Please enter email & password");
-        try {
-          statusEl.style.color = "#9ca3af";
-          statusEl.textContent = "Logging in...";
-          await loginWithEmail(email, pwd);
-          window.location.reload();
-        } catch (err) {
-          statusEl.style.color = "#ef4444";
-          statusEl.textContent = err.message;
-        }
-      };
-
-      document.getElementById('email-signup-btn').onclick = async () => {
-        const email = document.getElementById('email-field').value.trim();
-        const pwd = document.getElementById('password-field').value;
-        if (!email || !pwd) return alert("Please enter email & password to sign up");
-        try {
-          statusEl.style.color = "#9ca3af";
-          statusEl.textContent = "Creating account...";
-          await signUpWithEmail(email, pwd);
-          statusEl.style.color = "#10b981";
-          statusEl.textContent = "Check your email to confirm registration! 🚀";
-        } catch (err) {
-          statusEl.style.color = "#ef4444";
-          statusEl.textContent = err.message;
-        }
-      };
-
-      document.getElementById('magiclink-btn').onclick = async () => {
-        const email = document.getElementById('email-field').value.trim();
-        if (!email) return alert("Please enter your email for Magic Link");
-        try {
-          statusEl.style.color = "#9ca3af";
-          statusEl.textContent = "Sending Magic Link...";
-          await sendMagicLink(email);
-          statusEl.style.color = "#10b981";
-          statusEl.textContent = "Magic login link sent to your email! ✉️";
-        } catch (err) {
-          statusEl.style.color = "#ef4444";
-          statusEl.textContent = err.message;
-        }
-      };
-
-      document.getElementById('switch-account-btn').onclick = () => {
-        authBox.style.display = "flex";
-      };
-
-      document.getElementById('logout-btn').onclick = async () => {
-        if (supabaseClient) await supabaseClient.auth.signOut();
-        localStorage.removeItem('notshovel_auth_user');
-        window.location.href = 'index.html';
-      };
+      loadMergedProfile(targetUser);
     }
 
-    async function loadUserDetails(userHandle) {
+    async function loadMergedProfile(userHandle) {
       const avatarEl = document.getElementById('avatar-display');
       const karmaEl = document.getElementById('karma-count');
-      const joinEl = document.getElementById('join-date');
+      const ytSubEl = document.getElementById('yt-sub-count');
       const aboutEl = document.getElementById('user-about');
-      const statLabel1 = document.getElementById('stat-label-1');
       const reposContainer = document.getElementById('github-repos');
       const reposWrapper = document.getElementById('github-repos-wrapper');
-      const postsContainer = document.getElementById('user-posts');
+      const ytWrapper = document.getElementById('youtube-section-wrapper');
+      const ytContainer = document.getElementById('user-youtube-videos');
 
       document.getElementById('username').textContent = `@${userHandle}`;
 
-      // 1. Fetch GitHub Repos (Routed strictly internally)
+      // 1. Fetch GitHub
       try {
         const ghRes = await fetch(`https://api.github.com/users/${userHandle}`);
         if (ghRes.ok) {
           const ghUser = await ghRes.json();
-          
           avatarEl.style.backgroundImage = `url('${ghUser.avatar_url}')`;
           avatarEl.textContent = "";
-          statLabel1.textContent = "GitHub Stats";
           karmaEl.textContent = `${ghUser.public_repos} Repos • ${ghUser.followers} Followers`;
-          joinEl.textContent = new Date(ghUser.created_at).toLocaleDateString(undefined, {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
-          });
-          aboutEl.textContent = ghUser.bio || "GitHub authenticated user.";
+          aboutEl.textContent = ghUser.bio || "Active developer on NotShovel.";
 
           const reposRes = await fetch(`https://api.github.com/users/${userHandle}/repos?sort=updated&per_page=6`);
           const repos = await reposRes.json();
-
           if (Array.isArray(repos) && repos.length > 0) {
             reposWrapper.style.display = "block";
             reposContainer.innerHTML = repos.map(repo => `
@@ -311,7 +174,7 @@
                 <a href="repo.html?owner=${encodeURIComponent(userHandle)}&repo=${encodeURIComponent(repo.name)}" class="card-title">
                   📦 ${repo.name}
                 </a>
-                <p class="card-snippet">${repo.description || "No repository description provided."}</p>
+                <p class="card-snippet">${repo.description || "No description provided."}</p>
                 <div class="card-footer">
                   <span>⭐ ${repo.stargazers_count} stars • 🍴 ${repo.forks_count} forks</span>
                   <a href="repo.html?owner=${encodeURIComponent(userHandle)}&repo=${encodeURIComponent(repo.name)}" class="meta-link">Read Project →</a>
@@ -321,69 +184,84 @@
           }
         }
       } catch (e) {
-        console.warn("GitHub lookup error:", e);
+        console.warn("GitHub fetch error:", e);
       }
 
-      // 2. Fetch Hacker News Submissions
+      // 2. Fetch Linked YouTube Channel
+      const linkedChan = localStorage.getItem('notshovel_linked_channel') || userHandle;
+      try {
+        const apiKey = getYTKey();
+        const chanRes = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&forHandle=${encodeURIComponent(linkedChan)}&key=${apiKey}`);
+        let chanData = await chanRes.json();
+
+        if (!chanData.items || chanData.items.length === 0) {
+          // Fallback search by query
+          const searchRes = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(linkedChan)}&type=channel&maxResults=1&key=${apiKey}`);
+          const sData = await searchRes.json();
+          if (sData.items && sData.items.length > 0) {
+            const cId = sData.items[0].snippet.channelId;
+            const fallbackRes = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${cId}&key=${apiKey}`);
+            chanData = await fallbackRes.json();
+          }
+        }
+
+        if (chanData.items && chanData.items.length > 0) {
+          const chan = chanData.items[0];
+          ytSubEl.textContent = `${Number(chan.statistics.subscriberCount || 0).toLocaleString()} Subs`;
+          ytWrapper.style.display = "block";
+
+          const vidsRes = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${chan.id}&maxResults=4&order=date&type=video&key=${apiKey}`);
+          const vData = await vidsRes.json();
+
+          if (vData.items && vData.items.length > 0) {
+            ytContainer.innerHTML = vData.items.map(v => `
+              <article class="card">
+                <a href="video.html?v=${v.id.videoId}" class="card-title">
+                  ▶️ ${v.snippet.title}
+                </a>
+                <p class="card-snippet">${v.snippet.description || "Uploaded video."}</p>
+                <div class="card-footer">
+                  <span>Published ${new Date(v.snippet.publishedAt).toLocaleDateString()}</span>
+                  <a href="video.html?v=${v.id.videoId}" class="meta-link" style="color: #ef4444;">Watch in App →</a>
+                </div>
+              </article>
+            `).join('');
+          }
+        } else {
+          ytSubEl.textContent = "Not linked";
+        }
+      } catch (err) {
+        ytSubEl.textContent = "Not linked";
+      }
+
+      // 3. Submissions
+      loadCommunityPosts(userHandle);
+    }
+
+    async function loadCommunityPosts(userHandle) {
+      const postsContainer = document.getElementById('user-posts');
       try {
         const res = await fetch(`https://hacker-news.firebaseio.com/v0/user/${userHandle}.json`);
         const user = await res.json();
-
-        if (user) {
-          if (!avatarEl.style.backgroundImage || avatarEl.style.backgroundImage === 'none') {
-            avatarEl.textContent = userHandle.slice(0, 2).toUpperCase();
-            statLabel1.textContent = "Karma";
-            karmaEl.textContent = Number(user.karma || 0).toLocaleString();
-            joinEl.textContent = new Date(user.created * 1000).toLocaleDateString(undefined, {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric'
-            });
-            aboutEl.innerHTML = user.about || "No bio written.";
-          }
-
-          loadHackerNewsPosts(user.submitted || []);
-        } else {
-          postsContainer.innerHTML = `<p style="color: var(--text-muted); text-align: center;">No community submissions found for @${userHandle}.</p>`;
-        }
-      } catch (err) {
-        postsContainer.innerHTML = `<p style="color: var(--text-muted); text-align: center;">Could not load submissions.</p>`;
-      }
-    }
-
-    async function loadHackerNewsPosts(submittedIds) {
-      const postsContainer = document.getElementById('user-posts');
-      const sliceIds = submittedIds.slice(0, 8);
-
-      if (sliceIds.length === 0) {
-        postsContainer.innerHTML = `<p style="color: var(--text-muted); text-align: center;">No recent submissions found.</p>`;
-        return;
-      }
-
-      const itemFetches = sliceIds.map(id =>
-        fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`).then(r => r.json())
-      );
-      const items = await Promise.all(itemFetches);
-
-      postsContainer.innerHTML = items
-        .filter(item => item && !item.deleted && !item.dead)
-        .map(item => {
-          const isStory = item.type === 'story';
-          const title = item.title || (item.text ? item.text.slice(0, 90) + '...' : 'Untitled Post');
-          const targetUrl = isStory && item.url ? item.url : `comments.html?id=${item.id}`;
-
-          return `
+        if (user && user.submitted && user.submitted.length > 0) {
+          const items = await Promise.all(user.submitted.slice(0, 4).map(id =>
+            fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`).then(r => r.json())
+          ));
+          postsContainer.innerHTML = items.filter(i => i && !i.deleted).map(item => `
             <article class="card">
-              <a href="${targetUrl}" target="_blank" rel="noopener noreferrer" class="card-title">
-                ${title}
-              </a>
+              <a href="comments.html?id=${item.id}" class="card-title">${item.title || 'Discussion post'}</a>
               <div class="card-footer">
-                <span>${item.type.toUpperCase()} • ${item.score || 0} pts</span>
+                <span>${item.score || 0} pts</span>
                 <a href="comments.html?id=${item.id}" class="meta-link">View Discussion →</a>
               </div>
             </article>
-          `;
-        }).join('');
+          `).join('');
+        } else {
+          postsContainer.innerHTML = `<p style="color: var(--text-muted); text-align: center;">No recent submissions found.</p>`;
+        }
+      } catch (e) {
+        postsContainer.innerHTML = `<p style="color: var(--text-muted); text-align: center;">Activity currently quiet.</p>`;
+      }
     }
 
     document.addEventListener('DOMContentLoaded', initProfilePage);
