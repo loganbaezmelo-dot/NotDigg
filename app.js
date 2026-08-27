@@ -1,4 +1,5 @@
-// 1. Supabase Initialization
+// 1. Config & API Keys
+const YT_API_KEY = "AIzaSyDRUCdSjUO1KzLQh5aC3n6_62OAxplI4Q8";
 const SUPABASE_URL = "https://fjpqmmqnoyfrdsdhiunr.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZqcHFtbXFub3lmcmRzZGhpdW5yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc3ODUxNTEsImV4cCI6MjEwMzM2MTE1MX0.E3SY-5FxZqHP0t_p8dSr5xeUxKoZCI0d35Me_Rwrs94";
 
@@ -11,9 +12,7 @@ async function loginWithGitHub() {
   if (supabaseClient) {
     const { error } = await supabaseClient.auth.signInWithOAuth({
       provider: "github",
-      options: {
-        redirectTo: window.location.origin + "/profile.html"
-      }
+      options: { redirectTo: window.location.origin + "/profile.html" }
     });
     if (error) alert("GitHub OAuth error: " + error.message);
   }
@@ -43,7 +42,7 @@ async function sendMagicLink(email) {
   return data;
 }
 
-// 3. Sync UI with Active Auth Session
+// 3. UI State Management
 async function setupAuthUI() {
   let activeUser = localStorage.getItem("notshovel_auth_user");
   let avatarUrl = null;
@@ -80,13 +79,10 @@ async function setupAuthUI() {
       }
     });
   } else {
-    profileLinks.forEach(link => {
-      link.href = "profile.html";
-    });
+    profileLinks.forEach(link => { link.href = "profile.html"; });
   }
 }
 
-// 4. Sidebar Toggle Handler
 function setupSidebar() {
   const menuBtn = document.getElementById("menu-toggle");
   const closeBtn = document.getElementById("close-drawer");
@@ -100,7 +96,7 @@ function setupSidebar() {
   if (backdrop) backdrop.addEventListener("click", closeDrawer);
 }
 
-// 5. Global 3-Way Search (Profiles + In-App Repos + Stories)
+// 4. Global 4-Way Search (Profiles, Repos, Stories, and YouTube)
 function setupSearch() {
   const form = document.getElementById("search-form");
   const input = document.getElementById("search-input");
@@ -130,22 +126,24 @@ function setupSearch() {
     defaultFeeds.style.display = "none";
     resultsSection.style.display = "block";
     title.textContent = `Search: "${rawQuery}"`;
-    resultsList.innerHTML = `<p style="color: #9ca3af; text-align: center;">Searching profiles, repos, and stories... 🔍</p>`;
+    resultsList.innerHTML = `<p style="color: #9ca3af; text-align: center;">Searching NotShovel network & YouTube... 🔍</p>`;
 
     try {
-      const [userRes, ghRes, hnRes] = await Promise.all([
+      const [userRes, ghRes, hnRes, ytRes] = await Promise.all([
         fetch(`https://api.github.com/users/${encodeURIComponent(cleanHandle)}`),
-        fetch(`https://api.github.com/search/repositories?q=${encodeURIComponent(rawQuery)}&sort=stars&order=desc&per_page=4`),
-        fetch(`https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(rawQuery)}&tags=story&hitsPerPage=4`)
+        fetch(`https://api.github.com/search/repositories?q=${encodeURIComponent(rawQuery)}&sort=stars&order=desc&per_page=3`),
+        fetch(`https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(rawQuery)}&tags=story&hitsPerPage=3`),
+        fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=4&q=${encodeURIComponent(rawQuery)}&type=video,channel&key=${YT_API_KEY}`)
       ]);
 
       const ghUser = userRes.ok ? await userRes.json() : null;
       const ghData = await ghRes.json();
       const hnData = await hnRes.json();
+      const ytData = await ytRes.json();
 
       let cardsHtml = "";
 
-      // 1. Direct User Profile Card
+      // 1. Direct GitHub Profile Card
       if (ghUser && ghUser.login) {
         cardsHtml += `
           <article class="card" style="border-left: 3px solid #3b82f6;">
@@ -154,7 +152,7 @@ function setupSearch() {
                 <img src="${ghUser.avatar_url}" alt="${ghUser.login}" style="width: 32px; height: 32px; border-radius: 50%;" />
                 <div>
                   <a href="profile.html?user=${ghUser.login}" class="meta-link" style="font-weight: 700; font-size: 15px; color: #fff;">@${ghUser.login}</a>
-                  <p style="font-size: 12px; color: var(--text-muted);">${ghUser.name || 'Developer'}</p>
+                  <p style="font-size: 12px; color: var(--text-muted); margin: 0;">${ghUser.name || 'Developer'}</p>
                 </div>
               </div>
               <span class="badge" style="background: rgba(59, 130, 246, 0.2); color: #60a5fa;">User Profile</span>
@@ -168,7 +166,33 @@ function setupSearch() {
         `;
       }
 
-      // 2. In-App Repos
+      // 2. YouTube Search Results (Channels & Videos)
+      if (ytData.items && ytData.items.length > 0) {
+        cardsHtml += ytData.items.map(item => {
+          const isChannel = item.id.kind === "youtube#channel";
+          const targetUrl = isChannel ? `channel.html?id=${item.id.channelId}` : `video.html?v=${item.id.videoId}`;
+          const badgeText = isChannel ? "YouTube Channel" : "YouTube Video";
+          const icon = isChannel ? "📺" : "▶️";
+
+          return `
+            <article class="card" style="border-left: 3px solid #ef4444;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span class="badge" style="background: rgba(239, 68, 68, 0.2); color: #f87171;">${badgeText}</span>
+              </div>
+              <a href="${targetUrl}" class="card-title">
+                ${icon} ${item.snippet.title}
+              </a>
+              <p class="card-snippet">${item.snippet.description || "No description provided."}</p>
+              <div class="card-footer">
+                <span>By <a href="channel.html?id=${item.snippet.channelId}" class="meta-link" style="color: #ef4444;">${item.snippet.channelTitle}</a></span>
+                <a href="${targetUrl}" class="meta-link">Open in NotShovel →</a>
+              </div>
+            </article>
+          `;
+        }).join("");
+      }
+
+      // 3. GitHub In-App Repos
       if (ghData.items && ghData.items.length > 0) {
         cardsHtml += ghData.items.map(repo => `
           <article class="card">
@@ -191,7 +215,7 @@ function setupSearch() {
         `).join("");
       }
 
-      // 3. Tech Stories
+      // 4. Tech Stories
       if (hnData.hits && hnData.hits.length > 0) {
         cardsHtml += hnData.hits.map(item => {
           const storyUrl = item.url || `comments.html?id=${item.objectID}`;
@@ -213,11 +237,7 @@ function setupSearch() {
         }).join("");
       }
 
-      if (!cardsHtml) {
-        resultsList.innerHTML = `<p style="color: var(--text-muted); text-align: center;">No matching profiles, stories, or repositories found 😭</p>`;
-      } else {
-        resultsList.innerHTML = cardsHtml;
-      }
+      resultsList.innerHTML = cardsHtml || `<p style="color: var(--text-muted); text-align: center;">No results found across NotShovel & YouTube 😭</p>`;
 
     } catch (err) {
       resultsList.innerHTML = `<p style="color: #ef4444; text-align: center;">Search failed: ${err.message} 😭</p>`;
@@ -225,7 +245,7 @@ function setupSearch() {
   });
 }
 
-// 6. Live Tech Stories Loader (Hacker News)
+// 5. Live Tech Stories Loader (HN)
 async function loadFeed() {
   const container = document.getElementById("feed-list");
   if (!container) return;
@@ -270,7 +290,7 @@ async function loadFeed() {
   }
 }
 
-// 7. Dynamic GitHub Recommendations Loader (Direct in-app repo links)
+// 6. Dynamic GitHub Recommendations Loader
 async function loadGitHubRecommendations() {
   const container = document.getElementById("github-feed-list");
   if (!container) return;
@@ -281,7 +301,6 @@ async function loadGitHubRecommendations() {
     let feedRepos = [];
     const activeUser = localStorage.getItem("notshovel_auth_user");
 
-    // Logged in user repo
     if (activeUser) {
       try {
         const userRepoRes = await fetch(`https://api.github.com/users/${activeUser}/repos?sort=pushed&per_page=1`);
@@ -296,7 +315,6 @@ async function loadGitHubRecommendations() {
       }
     }
 
-    // Top trending repos
     const searchRes = await fetch(
       "https://api.github.com/search/repositories?q=stars:>100+pushed:>2026-01-01&sort=stars&order=desc&per_page=6"
     );
@@ -345,6 +363,46 @@ async function loadGitHubRecommendations() {
   }
 }
 
+// 7. Live Trending Tech YouTube Videos Loader
+async function loadTrendingYouTubeVideos() {
+  const container = document.getElementById("youtube-feed-list");
+  if (!container) return;
+
+  container.innerHTML = `<p style="color: #9ca3af; text-align: center;">Fetching top YouTube tech videos... 📺</p>`;
+
+  try {
+    const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&chart=mostPopular&q=software+engineering+web+development+tech&maxResults=5&type=video&key=${YT_API_KEY}`);
+    const data = await res.json();
+
+    if (data.items && data.items.length > 0) {
+      container.innerHTML = data.items.map(v => `
+        <article class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <a href="channel.html?id=${v.snippet.channelId}" class="meta-link" style="font-weight: 600; color: #ef4444;">
+              📺 ${v.snippet.channelTitle}
+            </a>
+            <span class="badge" style="background: rgba(239, 68, 68, 0.2); color: #f87171;">Video</span>
+          </div>
+
+          <a href="video.html?v=${v.id.videoId}" class="card-title">
+            ▶️ ${v.snippet.title}
+          </a>
+          <p class="card-snippet">${v.snippet.description || "No description provided."}</p>
+
+          <div class="card-footer">
+            <span>Published ${new Date(v.snippet.publishedAt).toLocaleDateString()}</span>
+            <a href="video.html?v=${v.id.videoId}" class="meta-link" style="color: #ef4444;">Watch Video 🎬 →</a>
+          </div>
+        </article>
+      `).join("");
+    } else {
+      container.innerHTML = `<p style="color: var(--text-muted); text-align: center;">No videos available.</p>`;
+    }
+  } catch (err) {
+    container.innerHTML = `<p style="color: #ef4444; text-align: center;">Failed to load YouTube feed: ${err.message} 😭</p>`;
+  }
+}
+
 // Init
 document.addEventListener("DOMContentLoaded", () => {
   setupSidebar();
@@ -352,4 +410,5 @@ document.addEventListener("DOMContentLoaded", () => {
   setupSearch();
   loadFeed();
   loadGitHubRecommendations();
+  loadTrendingYouTubeVideos();
 });
