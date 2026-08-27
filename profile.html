@@ -117,12 +117,13 @@
 
   <main class="container">
     
+    <!-- Profile View -->
     <section class="profile-card" id="profile-container" style="display: none;">
       <div class="profile-avatar-lg" id="avatar-display">?</div>
-      <h1 id="username" style="font-size: 22px; font-weight: 700;">Loading...</h1>
+      <h1 id="username" style="font-size: 22px; font-weight: 700;">Loading profile...</h1>
       
       <div class="stats-row" id="stats-container">
-        <span>Karma: <strong id="karma-count">--</strong></span>
+        <span><span id="stat-label-1">Stats</span>: <strong id="karma-count">--</strong></span>
         <span>Joined: <strong id="join-date">--</strong></span>
       </div>
 
@@ -134,6 +135,7 @@
       </div>
     </section>
 
+    <!-- Email & OAuth Login Card -->
     <section class="auth-card" id="auth-box" style="display: none;">
       <h2 style="font-size: 18px; font-weight: 700;">Authenticate with NotShovel</h2>
       <p style="font-size: 13px; color: var(--text-muted);">Sign in with GitHub or your Email 🚀</p>
@@ -156,16 +158,17 @@
       <p id="auth-status" style="font-size: 12px; margin-top: 6px;"></p>
     </section>
 
+    <!-- Recent Items / Repos Area -->
     <div id="submissions-area" style="display: none;">
-      <h2 class="section-title">Recent Submissions</h2>
+      <h2 class="section-title" id="activity-title">Recent Activity</h2>
       <section id="user-posts" class="feed-list">
-        <p style="color: var(--text-muted); text-align: center;">Fetching submissions...</p>
+        <p style="color: var(--text-muted); text-align: center;">Fetching data...</p>
       </section>
     </div>
 
   </main>
 
-  <script src="app.js?v=7"></script>
+  <script src="app.js?v=8"></script>
   <script>
     const urlParams = new URLSearchParams(window.location.search);
     let targetUser = urlParams.get('user');
@@ -176,7 +179,7 @@
       const subArea = document.getElementById('submissions-area');
       const statusEl = document.getElementById('auth-status');
 
-      // Check current Supabase session
+      // Sync Supabase active session
       let sessionUser = null;
       if (supabaseClient) {
         const { data: { session } } = await supabaseClient.auth.getSession();
@@ -190,7 +193,6 @@
         targetUser = sessionUser || localStorage.getItem('notshovel_auth_user');
       }
 
-      // If user isn't authenticated and no query param, show Auth Form
       if (!targetUser) {
         authBox.style.display = "flex";
         profileBox.style.display = "none";
@@ -202,7 +204,7 @@
         loadUserDetails(targetUser);
       }
 
-      // Button Listeners
+      // Event Listeners
       document.getElementById('github-auth-btn').onclick = () => loginWithGitHub();
 
       document.getElementById('email-login-btn').onclick = async () => {
@@ -229,7 +231,7 @@
           statusEl.textContent = "Creating account...";
           await signUpWithEmail(email, pwd);
           statusEl.style.color = "#10b981";
-          statusEl.textContent = "Check your email inbox to confirm registration! 🚀";
+          statusEl.textContent = "Check your email to confirm registration! 🚀";
         } catch (err) {
           statusEl.style.color = "#ef4444";
           statusEl.textContent = err.message;
@@ -263,32 +265,91 @@
     }
 
     async function loadUserDetails(userHandle) {
+      const avatarEl = document.getElementById('avatar-display');
+      const karmaEl = document.getElementById('karma-count');
+      const joinEl = document.getElementById('join-date');
+      const aboutEl = document.getElementById('user-about');
+      const statLabel1 = document.getElementById('stat-label-1');
+      const activityTitle = document.getElementById('activity-title');
+      const postsContainer = document.getElementById('user-posts');
+
+      document.getElementById('username').textContent = `@${userHandle}`;
+
+      // 1. First priority: Check GitHub API
+      try {
+        const ghRes = await fetch(`https://api.github.com/users/${userHandle}`);
+        if (ghRes.ok) {
+          const ghUser = await ghRes.json();
+          
+          avatarEl.style.backgroundImage = `url('${ghUser.avatar_url}')`;
+          avatarEl.textContent = "";
+          statLabel1.textContent = "GitHub Stats";
+          karmaEl.textContent = `${ghUser.public_repos} Repos • ${ghUser.followers} Followers`;
+          joinEl.textContent = new Date(ghUser.created_at).toLocaleDateString(undefined, {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+          });
+          aboutEl.textContent = ghUser.bio || "GitHub authenticated user.";
+          activityTitle.textContent = "Public Repositories";
+
+          const reposRes = await fetch(`https://api.github.com/users/${userHandle}/repos?sort=updated&per_page=6`);
+          const repos = await reposRes.json();
+
+          if (Array.isArray(repos) && repos.length > 0) {
+            postsContainer.innerHTML = repos.map(repo => `
+              <article class="card">
+                <a href="${repo.html_url}" target="_blank" rel="noopener noreferrer" class="card-title">
+                  📦 ${repo.name}
+                </a>
+                <p class="card-snippet">${repo.description || "No repository description provided."}</p>
+                <div class="card-footer">
+                  <span>⭐ ${repo.stargazers_count} stars • 🍴 ${repo.forks_count} forks</span>
+                  <a href="${repo.html_url}" target="_blank" class="meta-link">View on GitHub →</a>
+                </div>
+              </article>
+            `).join('');
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn("GitHub lookup skipped, checking Hacker News API", e);
+      }
+
+      // 2. Fallback: Hacker News User API
       try {
         const res = await fetch(`https://hacker-news.firebaseio.com/v0/user/${userHandle}.json`);
         const user = await res.json();
-        const avatarEl = document.getElementById('avatar-display');
-
-        document.getElementById('username').textContent = `@${userHandle}`;
 
         if (user) {
+          avatarEl.style.backgroundImage = 'none';
           avatarEl.textContent = userHandle.slice(0, 2).toUpperCase();
-          document.getElementById('karma-count').textContent = Number(user.karma || 0).toLocaleString();
-          document.getElementById('join-date').textContent = new Date(user.created * 1000).toLocaleDateString();
-          document.getElementById('user-about').innerHTML = user.about || "No bio written.";
-          loadUserPosts(user.submitted || []);
+          statLabel1.textContent = "Karma";
+          karmaEl.textContent = Number(user.karma || 0).toLocaleString();
+          joinEl.textContent = new Date(user.created * 1000).toLocaleDateString(undefined, {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+          });
+          aboutEl.innerHTML = user.about || "No bio written.";
+          activityTitle.textContent = "Recent Submissions";
+
+          loadHackerNewsPosts(user.submitted || []);
         } else {
+          avatarEl.style.backgroundImage = 'none';
           avatarEl.textContent = userHandle.slice(0, 2).toUpperCase();
-          document.getElementById('karma-count').textContent = "N/A";
-          document.getElementById('join-date').textContent = "Authenticated";
-          document.getElementById('user-about').textContent = "Logged into NotShovel via Supabase Auth.";
-          document.getElementById('user-posts').innerHTML = `<p style="color: var(--text-muted); text-align: center;">No HN submissions found for @${userHandle}.</p>`;
+          statLabel1.textContent = "Account";
+          karmaEl.textContent = "Verified";
+          joinEl.textContent = "Recently";
+          aboutEl.textContent = "Authenticated NotShovel user.";
+          postsContainer.innerHTML = `<p style="color: var(--text-muted); text-align: center;">No public feed submissions found for @${userHandle}.</p>`;
         }
       } catch (err) {
         document.getElementById('username').textContent = `@${userHandle}`;
       }
     }
 
-    async function loadUserPosts(submittedIds) {
+    async function loadHackerNewsPosts(submittedIds) {
       const postsContainer = document.getElementById('user-posts');
       const sliceIds = submittedIds.slice(0, 8);
 
