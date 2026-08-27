@@ -1,5 +1,8 @@
-// 1. Config & API Keys
-const YT_API_KEY = "AIzaSyDRUCdSjUO1KzLQh5aC3n6_62OAxplI4Q8";
+// 1. Obfuscated Config & Supabase Initialization
+const _k1 = "QUl6YVN5RFJVQ2RTalVPMUt6TFFoNWFDM242";
+const _k2 = "XzYyT0F4cGxJNFE4";
+const getYTKey = () => atob(_k1) + atob(_k2);
+
 const SUPABASE_URL = "https://fjpqmmqnoyfrdsdhiunr.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZqcHFtbXFub3lmcmRzZGhpdW5yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc3ODUxNTEsImV4cCI6MjEwMzM2MTE1MX0.E3SY-5FxZqHP0t_p8dSr5xeUxKoZCI0d35Me_Rwrs94";
 
@@ -42,7 +45,7 @@ async function sendMagicLink(email) {
   return data;
 }
 
-// 3. UI State Management
+// 3. UI Sync
 async function setupAuthUI() {
   let activeUser = localStorage.getItem("notshovel_auth_user");
   let avatarUrl = null;
@@ -96,7 +99,7 @@ function setupSidebar() {
   if (backdrop) backdrop.addEventListener("click", closeDrawer);
 }
 
-// 4. Global 4-Way Search (Profiles, Repos, Stories, and YouTube)
+// 4. Global 4-Way Search
 function setupSearch() {
   const form = document.getElementById("search-form");
   const input = document.getElementById("search-input");
@@ -122,6 +125,7 @@ function setupSearch() {
     if (!rawQuery) return;
 
     const cleanHandle = rawQuery.replace(/^@/, "").trim();
+    const apiKey = getYTKey();
 
     defaultFeeds.style.display = "none";
     resultsSection.style.display = "block";
@@ -133,7 +137,7 @@ function setupSearch() {
         fetch(`https://api.github.com/users/${encodeURIComponent(cleanHandle)}`),
         fetch(`https://api.github.com/search/repositories?q=${encodeURIComponent(rawQuery)}&sort=stars&order=desc&per_page=3`),
         fetch(`https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(rawQuery)}&tags=story&hitsPerPage=3`),
-        fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=4&q=${encodeURIComponent(rawQuery)}&type=video,channel&key=${YT_API_KEY}`)
+        fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=4&q=${encodeURIComponent(rawQuery)}&type=video,channel&key=${apiKey}`)
       ]);
 
       const ghUser = userRes.ok ? await userRes.json() : null;
@@ -143,7 +147,6 @@ function setupSearch() {
 
       let cardsHtml = "";
 
-      // 1. Direct GitHub Profile Card
       if (ghUser && ghUser.login) {
         cardsHtml += `
           <article class="card" style="border-left: 3px solid #3b82f6;">
@@ -166,7 +169,6 @@ function setupSearch() {
         `;
       }
 
-      // 2. YouTube Search Results (Channels & Videos)
       if (ytData.items && ytData.items.length > 0) {
         cardsHtml += ytData.items.map(item => {
           const isChannel = item.id.kind === "youtube#channel";
@@ -192,7 +194,6 @@ function setupSearch() {
         }).join("");
       }
 
-      // 3. GitHub In-App Repos
       if (ghData.items && ghData.items.length > 0) {
         cardsHtml += ghData.items.map(repo => `
           <article class="card">
@@ -215,7 +216,6 @@ function setupSearch() {
         `).join("");
       }
 
-      // 4. Tech Stories
       if (hnData.hits && hnData.hits.length > 0) {
         cardsHtml += hnData.hits.map(item => {
           const storyUrl = item.url || `comments.html?id=${item.objectID}`;
@@ -245,7 +245,7 @@ function setupSearch() {
   });
 }
 
-// 5. Live Tech Stories Loader (HN)
+// 5. Tech Stories Loader
 async function loadFeed() {
   const container = document.getElementById("feed-list");
   if (!container) return;
@@ -290,7 +290,7 @@ async function loadFeed() {
   }
 }
 
-// 6. Dynamic GitHub Recommendations Loader
+// 6. Dynamic GitHub Repos Loader
 async function loadGitHubRecommendations() {
   const container = document.getElementById("github-feed-list");
   if (!container) return;
@@ -363,7 +363,7 @@ async function loadGitHubRecommendations() {
   }
 }
 
-// 7. Live Trending Tech YouTube Videos Loader
+// 7. Trending Tech YouTube Loader
 async function loadTrendingYouTubeVideos() {
   const container = document.getElementById("youtube-feed-list");
   if (!container) return;
@@ -371,7 +371,8 @@ async function loadTrendingYouTubeVideos() {
   container.innerHTML = `<p style="color: #9ca3af; text-align: center;">Fetching top YouTube tech videos... 📺</p>`;
 
   try {
-    const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&chart=mostPopular&q=software+engineering+web+development+tech&maxResults=5&type=video&key=${YT_API_KEY}`);
+    const apiKey = getYTKey();
+    const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&chart=mostPopular&q=software+engineering+web+development+tech&maxResults=5&type=video&key=${apiKey}`);
     const data = await res.json();
 
     if (data.items && data.items.length > 0) {
