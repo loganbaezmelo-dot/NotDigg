@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>YouTube Channel | NotShovel</title>
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     .channel-header-card {
       background-color: var(--bg-card);
@@ -67,17 +68,36 @@
     </section>
   </main>
 
+  <script src="app.js?v=35"></script>
   <script>
-    const _k1 = "QUl6YVN5RFJVQ2RTalVPMUt6TFFoNWFDM242";
-    const _k2 = "XzYyT0F4cGxJNFE4";
-    const getYTKey = () => atob(_k1) + atob(_k2);
-
     const urlParams = new URLSearchParams(window.location.search);
     const channelId = urlParams.get('id');
 
     async function loadChannel() {
       if (!channelId) return;
 
+      // 1. Check if this YouTube Channel is linked to a NotShovel profile
+      if (supabaseClient) {
+        try {
+          const { data: dbProfile } = await supabaseClient
+            .from('profiles')
+            .select('github_username, display_name, google_email')
+            .eq('youtube_channel', channelId)
+            .maybeSingle();
+
+          if (dbProfile) {
+            const target = dbProfile.github_username || dbProfile.display_name || (dbProfile.google_email ? dbProfile.google_email.split('@')[0] : null);
+            if (target) {
+              window.location.replace(`profile.html?user=${encodeURIComponent(target)}`);
+              return;
+            }
+          }
+        } catch (e) {
+          console.warn("Channel redirect lookup error:", e);
+        }
+      }
+
+      // 2. Unclaimed channel fallback
       try {
         const apiKey = getYTKey();
         const res = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,contentDetails&id=${encodeURIComponent(channelId)}&key=${apiKey}`);
@@ -88,6 +108,23 @@
           const snip = chan.snippet;
           const stats = chan.statistics;
 
+          // Also check by custom handle if handle was stored
+          if (snip.customUrl && supabaseClient) {
+            const { data: handleProfile } = await supabaseClient
+              .from('profiles')
+              .select('github_username, display_name, google_email')
+              .eq('youtube_channel', snip.customUrl)
+              .maybeSingle();
+
+            if (handleProfile) {
+              const target = handleProfile.github_username || handleProfile.display_name || (handleProfile.google_email ? handleProfile.google_email.split('@')[0] : null);
+              if (target) {
+                window.location.replace(`profile.html?user=${encodeURIComponent(target)}`);
+                return;
+              }
+            }
+          }
+
           document.getElementById('chan-avatar').style.backgroundImage = `url('${snip.thumbnails.high ? snip.thumbnails.high.url : snip.thumbnails.default.url}')`;
           document.getElementById('chan-title').textContent = snip.title;
           document.getElementById('chan-custom-url').textContent = snip.customUrl || `@${snip.title.replace(/\s+/g, '')}`;
@@ -96,7 +133,6 @@
           document.getElementById('chan-views').textContent = Number(stats.viewCount || 0).toLocaleString();
           document.getElementById('chan-desc').textContent = snip.description || "No channel description available.";
 
-          // Resolve uploads playlist ID (1 unit)
           let uploadsPlaylistId = chan.contentDetails && chan.contentDetails.relatedPlaylists && chan.contentDetails.relatedPlaylists.uploads;
           if (!uploadsPlaylistId && channelId.startsWith("UC")) {
             uploadsPlaylistId = "UU" + channelId.substring(2);
@@ -117,7 +153,6 @@
       }
 
       try {
-        // 1 Quota unit instead of 100!
         const res = await fetch(`https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${encodeURIComponent(uploadsPlaylistId)}&maxResults=8&key=${apiKey}`);
         const data = await res.json();
 
