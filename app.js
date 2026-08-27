@@ -100,7 +100,7 @@ function setupSidebar() {
   if (backdrop) backdrop.addEventListener("click", closeDrawer);
 }
 
-// 5. Global 3-Way Search (User Profiles + Repos + Stories)
+// 5. Global 3-Way Search (Profiles + In-App Repos + Stories)
 function setupSearch() {
   const form = document.getElementById("search-form");
   const input = document.getElementById("search-input");
@@ -145,7 +145,7 @@ function setupSearch() {
 
       let cardsHtml = "";
 
-      // 1. Direct User Profile Match
+      // 1. Direct User Profile Card
       if (ghUser && ghUser.login) {
         cardsHtml += `
           <article class="card" style="border-left: 3px solid #3b82f6;">
@@ -168,7 +168,7 @@ function setupSearch() {
         `;
       }
 
-      // 2. GitHub Repositories
+      // 2. In-App Repos
       if (ghData.items && ghData.items.length > 0) {
         cardsHtml += ghData.items.map(repo => `
           <article class="card">
@@ -179,19 +179,19 @@ function setupSearch() {
               </div>
               <span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #34d399;">GitHub Repo</span>
             </div>
-            <a href="${repo.html_url}" target="_blank" rel="noopener noreferrer" class="card-title">
+            <a href="repo.html?owner=${repo.owner.login}&repo=${repo.name}" class="card-title">
               📦 ${repo.name}
             </a>
             <p class="card-snippet">${repo.description || "No description provided."}</p>
             <div class="card-footer">
               <span>⭐ ${repo.stargazers_count.toLocaleString()} stars • 🍴 ${repo.forks_count.toLocaleString()} forks</span>
-              <a href="${repo.html_url}" target="_blank" rel="noopener noreferrer" class="meta-link">View Repo ↗</a>
+              <a href="repo.html?owner=${repo.owner.login}&repo=${repo.name}" class="meta-link">Read Project →</a>
             </div>
           </article>
         `).join("");
       }
 
-      // 3. Tech Stories & Discussions
+      // 3. Tech Stories
       if (hnData.hits && hnData.hits.length > 0) {
         cardsHtml += hnData.hits.map(item => {
           const storyUrl = item.url || `comments.html?id=${item.objectID}`;
@@ -270,7 +270,7 @@ async function loadFeed() {
   }
 }
 
-// 7. Dynamic GitHub Recommendations Loader
+// 7. Dynamic GitHub Recommendations Loader (Direct in-app repo links)
 async function loadGitHubRecommendations() {
   const container = document.getElementById("github-feed-list");
   if (!container) return;
@@ -281,7 +281,7 @@ async function loadGitHubRecommendations() {
     let feedRepos = [];
     const activeUser = localStorage.getItem("notshovel_auth_user");
 
-    // Spotlight logged-in user repo
+    // Logged in user repo
     if (activeUser) {
       try {
         const userRepoRes = await fetch(`https://api.github.com/users/${activeUser}/repos?sort=pushed&per_page=1`);
@@ -296,7 +296,7 @@ async function loadGitHubRecommendations() {
       }
     }
 
-    // Trending repos across GitHub
+    // Top trending repos
     const searchRes = await fetch(
       "https://api.github.com/search/repositories?q=stars:>100+pushed:>2026-01-01&sort=stars&order=desc&per_page=6"
     );
@@ -327,14 +327,14 @@ async function loadGitHubRecommendations() {
             ${isUserRepo ? '<span class="badge" style="background: rgba(37, 99, 235, 0.2); color: #60a5fa;">Your Repo</span>' : '<span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #34d399;">Trending</span>'}
           </div>
 
-          <a href="${repo.html_url}" target="_blank" rel="noopener noreferrer" class="card-title">
+          <a href="repo.html?owner=${repo.owner.login}&repo=${repo.name}" class="card-title">
             📦 ${repo.name}
           </a>
           <p class="card-snippet">${repo.description || "Open source project on GitHub."}</p>
           
           <div class="card-footer">
             <span>⭐ ${repo.stargazers_count.toLocaleString()} stars • 🍴 ${repo.forks_count.toLocaleString()} forks</span>
-            <a href="${repo.html_url}" target="_blank" rel="noopener noreferrer" class="meta-link">View Repo ↗</a>
+            <a href="repo.html?owner=${repo.owner.login}&repo=${repo.name}" class="meta-link">Read Project →</a>
           </div>
         </article>
       `;
