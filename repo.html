@@ -17,10 +17,33 @@
     }
     .repo-stats {
       display: flex;
+      flex-wrap: wrap;
       gap: 16px;
       margin-top: 10px;
       font-size: 13px;
       color: var(--text-muted);
+    }
+    .file-tree-box {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 20px;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+    .file-item {
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13.5px;
+      color: var(--text-main);
+      border-radius: 6px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .file-item:last-child {
+      border-bottom: none;
     }
     .readme-box {
       background-color: var(--bg-card);
@@ -42,10 +65,6 @@
       font-family: monospace;
       color: #93c5fd;
     }
-    .readme-box a {
-      color: #3b82f6;
-      text-decoration: underline;
-    }
     .readme-box img {
       max-width: 100%;
       height: auto;
@@ -66,17 +85,18 @@
 
   <main class="container">
     
-    <!-- Repository Details Header -->
+    <!-- Repository Details Header (External Link Eradicated) -->
     <div class="repo-header" id="repo-header">
       <h1 id="repo-title" style="font-size: 20px; font-weight: 700;">Loading repository...</h1>
       <p id="repo-desc" style="color: var(--text-muted); font-size: 14px; margin-top: 6px;"></p>
       <div class="repo-stats" id="repo-stats"></div>
-      <div style="margin-top: 14px;">
-        <a id="external-gh-link" href="#" target="_blank" rel="noopener noreferrer" class="meta-link" style="color: #60a5fa; font-size: 13px;">
-          View on GitHub (External) ↗
-        </a>
-      </div>
     </div>
+
+    <!-- In-App Repository File Structure -->
+    <h2 style="font-size: 16px; font-weight: 700; margin-bottom: 10px; color: var(--text-main);">📁 Project Files</h2>
+    <section class="file-tree-box" id="file-list">
+      <p style="color: var(--text-muted); text-align: center; padding: 12px;">Loading files...</p>
+    </section>
 
     <!-- In-App README Viewer -->
     <h2 style="font-size: 16px; font-weight: 700; margin-bottom: 12px; color: var(--text-main);">📄 README.md</h2>
@@ -96,7 +116,7 @@
       const descEl = document.getElementById('repo-desc');
       const statsEl = document.getElementById('repo-stats');
       const readmeEl = document.getElementById('readme-content');
-      const externalLink = document.getElementById('external-gh-link');
+      const fileListEl = document.getElementById('file-list');
 
       if (!owner || !repo) {
         titleEl.textContent = "No repository specified.";
@@ -105,7 +125,6 @@
       }
 
       titleEl.textContent = `📦 ${owner} / ${repo}`;
-      externalLink.href = `https://github.com/${owner}/${repo}`;
 
       // 1. Fetch Repository Metadata
       try {
@@ -117,14 +136,37 @@
             <span>⭐ <strong>${data.stargazers_count.toLocaleString()}</strong> stars</span>
             <span>🍴 <strong>${data.forks_count.toLocaleString()}</strong> forks</span>
             <span>👀 <strong>${data.subscribers_count || 0}</strong> watchers</span>
-            <span>Default branch: <strong>${data.default_branch}</strong></span>
+            <span>Branch: <strong>${data.default_branch}</strong></span>
           `;
         }
       } catch (e) {
         console.warn("Could not fetch repo metadata", e);
       }
 
-      // 2. Fetch and render README
+      // 2. Fetch In-App File Directory Tree
+      try {
+        const contentsRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents`);
+        if (contentsRes.ok) {
+          const files = await contentsRes.json();
+          if (Array.isArray(files)) {
+            fileListEl.innerHTML = files.map(file => {
+              const icon = file.type === 'dir' ? '📁' : '📄';
+              return `
+                <div class="file-item">
+                  <span>${icon}</span>
+                  <span style="font-family: monospace; font-size: 13px;">${file.name}</span>
+                </div>
+              `;
+            }).join('');
+          }
+        } else {
+          fileListEl.innerHTML = `<p style="color: var(--text-muted); font-size: 13px; text-align: center;">Unable to load file structure.</p>`;
+        }
+      } catch (e) {
+        fileListEl.innerHTML = `<p style="color: var(--text-muted); font-size: 13px; text-align: center;">File tree unavailable.</p>`;
+      }
+
+      // 3. Fetch and render README in NotShovel
       try {
         const readmeRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/readme`, {
           headers: { "Accept": "application/vnd.github.v3.raw" }
@@ -133,6 +175,11 @@
         if (readmeRes.ok) {
           const markdownText = await readmeRes.text();
           readmeEl.innerHTML = marked.parse(markdownText);
+          
+          // Neutralize any sneaky outgoing links inside the README itself
+          readmeEl.querySelectorAll('a').forEach(a => {
+            a.removeAttribute('target');
+          });
         } else {
           readmeEl.innerHTML = `<p style="color: var(--text-muted); text-align: center;">No README.md found in this repository.</p>`;
         }
