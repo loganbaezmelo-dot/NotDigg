@@ -440,7 +440,7 @@ async function loadGitHubRecommendations(limit = 6) {
   }
 }
 
-// 7. Trending YouTube Loader (Clean Query & Robust Parser)
+// 7. Trending YouTube Loader (Costs 1 Quota Unit!)
 async function loadTrendingYouTubeVideos(limit = 5) {
   const container = document.getElementById("youtube-feed-list");
   if (!container) return;
@@ -449,7 +449,8 @@ async function loadTrendingYouTubeVideos(limit = 5) {
 
   try {
     const apiKey = getYTKey();
-    const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&q=programming+tech+software+development&type=video&maxResults=${limit}&key=${apiKey}`);
+    // VideoCategoryId 28 = Science & Tech; chart=mostPopular costs ONLY 1 quota unit instead of 100!
+    const res = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&chart=mostPopular&videoCategoryId=28&maxResults=${limit}&key=${apiKey}`);
     const data = await res.json();
 
     if (data.error) {
@@ -467,14 +468,14 @@ async function loadTrendingYouTubeVideos(limit = 5) {
             <span class="badge" style="background: rgba(239, 68, 68, 0.2); color: #f87171;">Video</span>
           </div>
 
-          <a href="video.html?v=${v.id.videoId}" class="card-title">
+          <a href="video.html?v=${v.id}" class="card-title">
             ▶️ ${v.snippet.title}
           </a>
           <p class="card-snippet">${v.snippet.description || "No description provided."}</p>
 
           <div class="card-footer">
             <span>Published ${new Date(v.snippet.publishedAt).toLocaleDateString()}</span>
-            <a href="video.html?v=${v.id.videoId}" class="meta-link" style="color: #ef4444;">Watch Video 🎬 →</a>
+            <a href="video.html?v=${v.id}" class="meta-link" style="color: #ef4444;">Watch Video 🎬 →</a>
           </div>
         </article>
       `).join("");
@@ -486,7 +487,7 @@ async function loadTrendingYouTubeVideos(limit = 5) {
   }
 }
 
-// 8. Layout Filter System
+// 8. Layout Filter System (Takes Over Full Page When Clicked)
 function setupFeedFilters() {
   const pills = document.querySelectorAll(".filter-pill");
   const secStories = document.getElementById("section-stories");
