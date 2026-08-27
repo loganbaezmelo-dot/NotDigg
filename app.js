@@ -100,7 +100,7 @@ function setupSidebar() {
   if (backdrop) backdrop.addEventListener("click", closeDrawer);
 }
 
-// 5. Live Tech Stories Loader
+// 5. Live Tech Stories Loader (Hacker News)
 async function loadFeed() {
   const container = document.getElementById("feed-list");
   if (!container) return;
@@ -145,59 +145,83 @@ async function loadFeed() {
   }
 }
 
-// 6. GitHub Recommendations & Logged-In User Repos Loader
+// 6. Real Dynamic GitHub Recommendation Engine (Trending + Active User Spotlight)
 async function loadGitHubRecommendations() {
   const container = document.getElementById("github-feed-list");
   if (!container) return;
 
-  container.innerHTML = `<p style="color: #9ca3af; text-align: center;">Fetching GitHub spotlight repos... 📦</p>`;
+  container.innerHTML = `<p style="color: #9ca3af; text-align: center;">Fetching trending GitHub recommendations... 📦</p>`;
 
   try {
-    let spotlightUsers = ["loganbaezmelo-dot", "torvalds", "facebook", "vercel"];
+    let feedRepos = [];
     const activeUser = localStorage.getItem("notshovel_auth_user");
-    
-    // Put current authenticated user right at the very front of the list
-    if (activeUser && !spotlightUsers.includes(activeUser)) {
-      spotlightUsers.unshift(activeUser);
+
+    // 1. If user is authenticated, spotlight their latest pushed repo first
+    if (activeUser) {
+      try {
+        const userRepoRes = await fetch(`https://api.github.com/users/${activeUser}/repos?sort=pushed&per_page=1`);
+        if (userRepoRes.ok) {
+          const userRepos = await userRepoRes.json();
+          if (Array.isArray(userRepos) && userRepos.length > 0) {
+            feedRepos.push(userRepos[0]);
+          }
+        }
+      } catch (err) {
+        console.warn("Could not fetch active user repo", err);
+      }
     }
 
-    const repoPromises = spotlightUsers.slice(0, 3).map(user =>
-      fetch(`https://api.github.com/users/${user}/repos?sort=pushed&per_page=2`)
-        .then(r => r.ok ? r.json() : [])
-        .catch(() => [])
+    // 2. Query real-time top starred repositories on GitHub
+    const searchRes = await fetch(
+      "https://api.github.com/search/repositories?q=stars:>100+pushed:>2026-01-01&sort=stars&order=desc&per_page=6"
     );
 
-    const repoResults = await Promise.all(repoPromises);
-    const allRepos = repoResults.flat().filter(r => r && r.name);
+    if (searchRes.ok) {
+      const searchData = await searchRes.json();
+      const trending = (searchData.items || []).filter(
+        repo => !feedRepos.some(existing => existing.id === repo.id)
+      );
+      feedRepos = [...feedRepos, ...trending].slice(0, 6);
+    }
 
-    if (allRepos.length === 0) {
-      container.innerHTML = `<p style="color: var(--text-muted); text-align: center;">No repos found.</p>`;
+    if (feedRepos.length === 0) {
+      container.innerHTML = `<p style="color: var(--text-muted); text-align: center;">No recommendations available right now.</p>`;
       return;
     }
 
-    container.innerHTML = allRepos.map(repo => `
-      <article class="card">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <img src="${repo.owner.avatar_url}" alt="${repo.owner.login}" style="width: 22px; height: 22px; border-radius: 50%;" />
-          <a href="profile.html?user=${repo.owner.login}" class="meta-link" style="font-weight: 600;">@${repo.owner.login}</a>
-        </div>
-        <a href="${repo.html_url}" target="_blank" rel="noopener noreferrer" class="card-title">
-          📦 ${repo.name}
-        </a>
-        <p class="card-snippet">${repo.description || "Open source project on GitHub."}</p>
-        <div class="card-footer">
-          <span>⭐ ${repo.stargazers_count} stars • 🍴 ${repo.forks_count} forks</span>
-          <a href="${repo.html_url}" target="_blank" rel="noopener noreferrer" class="meta-link">View Repo ↗</a>
-        </div>
-      </article>
-    `).join("");
+    // 3. Render real recommendations cards
+    container.innerHTML = feedRepos.map(repo => {
+      const isUserRepo = activeUser && repo.owner.login.toLowerCase() === activeUser.toLowerCase();
+      
+      return `
+        <article class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <img src="${repo.owner.avatar_url}" alt="${repo.owner.login}" style="width: 22px; height: 22px; border-radius: 50%;" />
+              <a href="profile.html?user=${repo.owner.login}" class="meta-link" style="font-weight: 600;">@${repo.owner.login}</a>
+            </div>
+            ${isUserRepo ? '<span class="badge" style="background: rgba(37, 99, 235, 0.2); color: #60a5fa;">Your Repo</span>' : '<span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #34d399;">Trending</span>'}
+          </div>
+
+          <a href="${repo.html_url}" target="_blank" rel="noopener noreferrer" class="card-title">
+            📦 ${repo.name}
+          </a>
+          <p class="card-snippet">${repo.description || "Open source project on GitHub."}</p>
+          
+          <div class="card-footer">
+            <span>⭐ ${repo.stargazers_count.toLocaleString()} stars • 🍴 ${repo.forks_count.toLocaleString()} forks</span>
+            <a href="${repo.html_url}" target="_blank" rel="noopener noreferrer" class="meta-link">View Repo ↗</a>
+          </div>
+        </article>
+      `;
+    }).join("");
 
   } catch (err) {
-    container.innerHTML = `<p style="color: #ef4444; text-align: center;">Failed to load GitHub repos 😭💀</p>`;
+    container.innerHTML = `<p style="color: #ef4444; text-align: center;">Failed to load GitHub recommendations: ${err.message} 😭</p>`;
   }
 }
 
-// Init on DOM Ready
+// Init on Load
 document.addEventListener("DOMContentLoaded", () => {
   setupSidebar();
   setupAuthUI();
