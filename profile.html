@@ -116,7 +116,7 @@
 
   </main>
 
-  <script src="app.js?v=15"></script>
+  <script src="app.js?v=16"></script>
   <script>
     const urlParams = new URLSearchParams(window.location.search);
     let targetUser = urlParams.get('user');
@@ -147,10 +147,10 @@
         document.getElementById('owner-actions').style.display = "block";
       }
 
-      loadMergedProfile(targetUser, isOwnProfile);
+      loadMergedProfile(targetUser);
     }
 
-    async function loadMergedProfile(userHandle, isOwnProfile) {
+    async function loadMergedProfile(userHandle) {
       const avatarEl = document.getElementById('avatar-display');
       const karmaEl = document.getElementById('karma-count');
       const ytStatBox = document.getElementById('yt-stat-box');
@@ -195,16 +195,31 @@
         console.warn("GitHub fetch error:", e);
       }
 
-      // 2. Fetch YouTube Channel (Only use saved channel if viewing YOUR OWN profile)
-      let lookupChannel = isOwnProfile ? (localStorage.getItem('notshovel_linked_channel') || userHandle) : userHandle;
+      // 2. Fetch Public Linked YouTube Channel from Supabase DB
+      let publicChannel = userHandle;
+      if (supabaseClient) {
+        try {
+          const { data: dbProfile } = await supabaseClient
+            .from('profiles')
+            .select('youtube_channel')
+            .ilike('github_username', userHandle)
+            .single();
+
+          if (dbProfile && dbProfile.youtube_channel) {
+            publicChannel = dbProfile.youtube_channel;
+          }
+        } catch (dbErr) {
+          console.warn("Supabase lookup error:", dbErr);
+        }
+      }
 
       try {
         const apiKey = getYTKey();
-        const chanRes = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&forHandle=${encodeURIComponent(lookupChannel)}&key=${apiKey}`);
+        const chanRes = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&forHandle=${encodeURIComponent(publicChannel)}&key=${apiKey}`);
         let chanData = await chanRes.json();
 
         if (!chanData.items || chanData.items.length === 0) {
-          const searchRes = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(lookupChannel)}&type=channel&maxResults=1&key=${apiKey}`);
+          const searchRes = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(publicChannel)}&type=channel&maxResults=1&key=${apiKey}`);
           const sData = await searchRes.json();
           if (sData.items && sData.items.length > 0) {
             const cId = sData.items[0].snippet.channelId;
