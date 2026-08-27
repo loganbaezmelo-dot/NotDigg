@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YouTube Channel | NotShovel</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .channel-header-card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 24px 18px;
+      margin-top: 15px;
+      margin-bottom: 24px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+    .channel-avatar-lg {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background-size: cover;
+      background-position: center;
+      background-color: #333;
+      border: 2px solid #ef4444;
+    }
+    .video-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+  </style>
+</head>
+<body>
+
+  <header class="navbar">
+    <div class="nav-left">
+      <a href="index.html" class="logo">notshovel</a>
+    </div>
+    <div class="nav-right">
+      <a href="index.html" class="meta-link" style="color: white;">← Back to feed</a>
+    </div>
+  </header>
+
+  <main class="container">
+    
+    <!-- Channel Metadata Card -->
+    <section class="channel-header-card">
+      <div class="channel-avatar-lg" id="chan-avatar"></div>
+      <h1 id="chan-title" style="font-size: 22px; font-weight: 700; margin: 0;">Loading channel...</h1>
+      <p id="chan-custom-url" style="font-size: 13px; color: #ef4444; margin: 0;"></p>
+      
+      <div class="stats-row" style="display: flex; gap: 20px; font-size: 13px; color: var(--text-muted);">
+        <span>Subscribers: <strong id="chan-subs" style="color: #fff;">--</strong></span>
+        <span>Videos: <strong id="chan-vids" style="color: #fff;">--</strong></span>
+        <span>Views: <strong id="chan-views" style="color: #fff;">--</strong></span>
+      </div>
+
+      <p id="chan-desc" class="user-bio" style="font-size: 13.5px; color: #d1d5db; max-width: 500px; line-height: 1.6;"></p>
+    </section>
+
+    <!-- Uploaded Videos Section -->
+    <h2 class="section-title" style="font-size: 16px; font-weight: 700; margin-bottom: 12px;">Recent Uploads</h2>
+    <section class="video-grid" id="channel-videos">
+      <p style="color: var(--text-muted); text-align: center;">Fetching uploads...</p>
+    </section>
+
+  </main>
+
+  <script>
+    const YT_KEY = "AIzaSyDRUCdSjUO1KzLQh5aC3n6_62OAxplI4Q8";
+    const urlParams = new URLSearchParams(window.location.search);
+    const channelId = urlParams.get('id');
+
+    async function loadChannel() {
+      if (!channelId) return;
+
+      try {
+        const res = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${channelId}&key=${YT_KEY}`);
+        const data = await res.json();
+
+        if (data.items && data.items.length > 0) {
+          const chan = data.items[0];
+          const snip = chan.snippet;
+          const stats = chan.statistics;
+
+          document.getElementById('chan-avatar').style.backgroundImage = `url('${snip.thumbnails.high ? snip.thumbnails.high.url : snip.thumbnails.default.url}')`;
+          document.getElementById('chan-title').textContent = snip.title;
+          document.getElementById('chan-custom-url').textContent = snip.customUrl || `@${snip.title.replace(/\s+/g, '')}`;
+          document.getElementById('chan-subs').textContent = Number(stats.subscriberCount || 0).toLocaleString();
+          document.getElementById('chan-vids').textContent = Number(stats.videoCount || 0).toLocaleString();
+          document.getElementById('chan-views').textContent = Number(stats.viewCount || 0).toLocaleString();
+          document.getElementById('chan-desc').textContent = snip.description || "No channel description available.";
+
+          // Fetch Channel Uploads
+          loadChannelVideos();
+        }
+      } catch (err) {
+        document.getElementById('chan-title').textContent = "Failed to load channel details.";
+      }
+    }
+
+    async function loadChannelVideos() {
+      const vidsContainer = document.getElementById('channel-videos');
+      try {
+        const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&maxResults=8&order=date&type=video&key=${YT_KEY}`);
+        const data = await res.json();
+
+        if (data.items && data.items.length > 0) {
+          vidsContainer.innerHTML = data.items.map(v => `
+            <article class="card">
+              <a href="video.html?v=${v.id.videoId}" class="card-title">
+                ▶️ ${v.snippet.title}
+              </a>
+              <p class="card-snippet">${v.snippet.description || "No description."}</p>
+              <div class="card-footer">
+                <span>Published ${new Date(v.snippet.publishedAt).toLocaleDateString()}</span>
+                <a href="video.html?v=${v.id.videoId}" class="meta-link" style="color: #ef4444;">Watch Video →</a>
+              </div>
+            </article>
+          `).join('');
+        } else {
+          vidsContainer.innerHTML = `<p style="color: var(--text-muted); text-align: center;">No videos found.</p>`;
+        }
+      } catch (e) {
+        vidsContainer.innerHTML = `<p style="color: #ef4444; text-align: center;">Failed to load uploads 😭</p>`;
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadChannel);
+  </script>
+</body>
+</html>
