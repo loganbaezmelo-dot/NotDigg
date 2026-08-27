@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login | NotShovel</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    .auth-container {
+      max-width: 400px;
+      margin: 40px auto;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 28px 20px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .oauth-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      padding: 11px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--border-color);
+      background: var(--bg-card-hover);
+      color: var(--text-main);
+      transition: opacity 0.15s;
+    }
+    .oauth-btn:hover { opacity: 0.9; }
+    .oauth-btn.google { background: #ffffff; color: #1f2937; border: none; }
+    .oauth-btn.github { background: #24292e; color: #ffffff; border: 1px solid #374151; }
+    .auth-divider {
+      display: flex;
+      align-items: center;
+      text-align: center;
+      margin: 10px 0;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+    .auth-divider::before, .auth-divider::after {
+      content: '';
+      flex: 1;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .auth-divider span { padding: 0 10px; }
+    .auth-input {
+      width: 100%;
+      background: #121214;
+      border: 1px solid var(--border-color);
+      color: #fff;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 14px;
+      outline: none;
+      box-sizing: border-box;
+    }
+    .auth-input:focus { border-color: #3b82f6; }
+  </style>
+</head>
+<body>
+
+  <header class="navbar">
+    <div class="nav-left">
+      <a href="index.html" class="logo">notshovel</a>
+    </div>
+    <div class="nav-right">
+      <a href="index.html" class="meta-link" style="color: white;">← Back to feed</a>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="auth-container">
+      <h1 style="font-size: 22px; font-weight: 700; margin: 0;">Sign In to NotShovel</h1>
+      <p style="font-size: 13px; color: var(--text-muted); margin: 0;">Access your feed, projects, and integrations 🚀</p>
+
+      <!-- Google OAuth -->
+      <button id="google-login-btn" class="oauth-btn google">
+        <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
+        Continue with Google
+      </button>
+
+      <!-- GitHub OAuth -->
+      <button id="github-login-btn" class="oauth-btn github">
+        🐙 Continue with GitHub
+      </button>
+
+      <div class="auth-divider"><span>OR EMAIL</span></div>
+
+      <input type="email" id="email-field" class="auth-input" placeholder="Enter your email" />
+      <input type="password" id="password-field" class="auth-input" placeholder="Password (Optional for Magic Link)" />
+
+      <div style="display: flex; gap: 8px; justify-content: center;">
+        <button id="email-signin-btn" class="action-btn" style="flex: 1;">Sign In</button>
+        <button id="email-signup-btn" class="action-btn" style="flex: 1;">Sign Up</button>
+      </div>
+
+      <button id="magiclink-btn" class="action-btn" style="width: 100%;">✉️ Send Magic Link</button>
+      <p id="status-msg" style="font-size: 12px; margin: 0;"></p>
+    </section>
+  </main>
+
+  <script src="app.js?v=13"></script>
+  <script>
+    document.getElementById('google-login-btn').onclick = () => loginWithGoogle();
+    document.getElementById('github-login-btn').onclick = () => loginWithGitHub();
+
+    const statusEl = document.getElementById('status-msg');
+
+    document.getElementById('email-signin-btn').onclick = async () => {
+      const email = document.getElementById('email-field').value.trim();
+      const pwd = document.getElementById('password-field').value;
+      if (!email || !pwd) return alert("Enter email and password");
+      try {
+        statusEl.style.color = "#9ca3af";
+        statusEl.textContent = "Authenticating...";
+        await loginWithEmail(email, pwd);
+        window.location.href = "index.html";
+      } catch (err) {
+        statusEl.style.color = "#ef4444";
+        statusEl.textContent = err.message;
+      }
+    };
+
+    document.getElementById('email-signup-btn').onclick = async () => {
+      const email = document.getElementById('email-field').value.trim();
+      const pwd = document.getElementById('password-field').value;
+      if (!email || !pwd) return alert("Enter email and password to sign up");
+      try {
+        statusEl.style.color = "#9ca3af";
+        statusEl.textContent = "Registering...";
+        await signUpWithEmail(email, pwd);
+        statusEl.style.color = "#10b981";
+        statusEl.textContent = "Check email for confirmation link! ✉️";
+      } catch (err) {
+        statusEl.style.color = "#ef4444";
+        statusEl.textContent = err.message;
+      }
+    };
+
+    document.getElementById('magiclink-btn').onclick = async () => {
+      const email = document.getElementById('email-field').value.trim();
+      if (!email) return alert("Enter email for Magic Link");
+      try {
+        statusEl.style.color = "#9ca3af";
+        statusEl.textContent = "Sending Magic Link...";
+        await sendMagicLink(email);
+        statusEl.style.color = "#10b981";
+        statusEl.textContent = "Magic link sent! Check your inbox ✉️";
+      } catch (err) {
+        statusEl.style.color = "#ef4444";
+        statusEl.textContent = err.message;
+      }
+    };
+  </script>
+</body>
+</html>
