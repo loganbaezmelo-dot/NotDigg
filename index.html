@@ -6,6 +6,39 @@
   <title>NotShovel | Tech Feed</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    /* Filter Pill Bar */
+    .filter-bar {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 6px;
+      margin-bottom: 16px;
+      scrollbar-width: none;
+    }
+    .filter-bar::-webkit-scrollbar { display: none; }
+    .filter-pill {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+    }
+    .filter-pill:hover {
+      background: var(--bg-card-hover);
+      color: #fff;
+    }
+    .filter-pill.active {
+      background: #2563eb;
+      color: #fff;
+      border-color: #3b82f6;
+    }
+  </style>
 </head>
 <body>
 
@@ -50,7 +83,7 @@
   <main class="container">
     
     <!-- Real-time 4-Way Search Box -->
-    <div style="margin-top: 14px; margin-bottom: 20px;">
+    <div style="margin-top: 14px; margin-bottom: 14px;">
       <form id="search-form" style="display: flex; gap: 8px;">
         <input 
           type="text" 
@@ -64,6 +97,14 @@
       </form>
     </div>
 
+    <!-- Feed Filter Pills -->
+    <div class="filter-bar" id="filter-bar">
+      <button class="filter-pill active" data-filter="all">🌐 All Feeds</button>
+      <button class="filter-pill" data-filter="stories">🔥 Expanded Stories</button>
+      <button class="filter-pill" data-filter="github">📦 Expanded GitHub</button>
+      <button class="filter-pill" data-filter="youtube">📺 Expanded YouTube</button>
+    </div>
+
     <!-- Search Results Feed -->
     <div id="search-results-section" style="display: none; margin-bottom: 30px;">
       <header class="feed-header">
@@ -75,27 +116,38 @@
 
     <!-- Default Feeds Group -->
     <div id="default-feeds">
-      <header class="feed-header">
-        <h1>Top Tech Stories</h1>
-        <span class="badge">Live Aggregator</span>
-      </header>
-      <section id="feed-list" class="feed-list"></section>
+      
+      <!-- 1. Stories Section -->
+      <div id="section-stories">
+        <header class="feed-header">
+          <h1 id="stories-title">Top Tech Stories</h1>
+          <span class="badge">Live Aggregator</span>
+        </header>
+        <section id="feed-list" class="feed-list"></section>
+      </div>
 
-      <header class="feed-header" style="margin-top: 36px;">
-        <h1>GitHub Recommendations & Community</h1>
-        <span class="badge" style="background-color: rgba(16, 185, 129, 0.2); color: #34d399;">Active Projects</span>
-      </header>
-      <section id="github-feed-list" class="feed-list"></section>
+      <!-- 2. GitHub Section -->
+      <div id="section-github">
+        <header class="feed-header" style="margin-top: 36px;">
+          <h1 id="github-title">GitHub Recommendations & Community</h1>
+          <span class="badge" style="background-color: rgba(16, 185, 129, 0.2); color: #34d399;">Active Projects</span>
+        </header>
+        <section id="github-feed-list" class="feed-list"></section>
+      </div>
 
-      <header class="feed-header" style="margin-top: 36px;">
-        <h1>Trending Tech Videos</h1>
-        <span class="badge" style="background-color: rgba(239, 68, 68, 0.2); color: #f87171;">YouTube</span>
-      </header>
-      <section id="youtube-feed-list" class="feed-list"></section>
+      <!-- 3. YouTube Section -->
+      <div id="section-youtube">
+        <header class="feed-header" style="margin-top: 36px;">
+          <h1 id="youtube-title">Trending Tech Videos</h1>
+          <span class="badge" style="background-color: rgba(239, 68, 68, 0.2); color: #f87171;">YouTube</span>
+        </header>
+        <section id="youtube-feed-list" class="feed-list"></section>
+      </div>
+
     </div>
 
   </main>
 
-  <script src="app.js?v=13"></script>
+  <script src="app.js?v=26"></script>
 </body>
 </html>
