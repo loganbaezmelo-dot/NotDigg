@@ -78,7 +78,7 @@
       <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-color);">
         <h4 style="font-size: 14px; margin: 0 0 8px 0;">Active Linked YouTube Channel</h4>
         <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">
-          Saved to Supabase database so everyone sees your channel attached to your profile:
+          Saved to Supabase database (each channel can only belong to one account):
         </p>
         <div style="display: flex; gap: 8px;">
           <input type="text" id="manual-channel-input" class="auth-input" style="flex: 1; background: #121214; border: 1px solid var(--border-color); color: #fff; padding: 8px 12px; border-radius: 8px; font-size: 13px;" placeholder="e.g. @YourChannel or UCxxxxxxxx" />
@@ -93,7 +93,7 @@
     </div>
   </main>
 
-  <script src="app.js?v=21"></script>
+  <script src="app.js?v=25"></script>
   <script>
     async function initSettings() {
       const ytBtn = document.getElementById('connect-yt-btn');
@@ -142,7 +142,7 @@
       if (googleIdentity) {
         const googleName = (googleIdentity.identity_data && (googleIdentity.identity_data.full_name || googleIdentity.identity_data.name)) || "";
         
-        // If not yet saved in cloud profile, automatically search and link channel by Google Name
+        // Auto-search channel if empty
         if ((!cloudProfile || !cloudProfile.youtube_channel) && googleName) {
           try {
             ytStatus.textContent = `Resolving channel for "${googleName}"... 🔍`;
@@ -154,15 +154,29 @@
               const matchedChannelId = sData.items[0].snippet.channelId;
               const matchedTitle = sData.items[0].snippet.title;
 
-              await supabaseClient.from('profiles').upsert({
-                id: user.id,
-                github_username: ghUsername ? ghUsername.toLowerCase() : null,
-                youtube_channel: matchedChannelId,
-                updated_at: new Date()
-              });
+              // Check if someone else already took this channel
+              const { data: existingOwner } = await supabaseClient
+                .from('profiles')
+                .select('id')
+                .eq('youtube_channel', matchedChannelId)
+                .neq('id', user.id)
+                .maybeSingle();
 
-              manualInput.value = matchedChannelId;
-              ytStatus.textContent = `Auto-linked: "${matchedTitle}" (${matchedChannelId}) ✅`;
+              if (!existingOwner) {
+                await supabaseClient.from('profiles').upsert({
+                  id: user.id,
+                  github_username: ghUsername ? ghUsername.toLowerCase() : (cloudProfile ? cloudProfile.github_username : null),
+                  google_email: user.email,
+                  display_name: googleName,
+                  youtube_channel: matchedChannelId,
+                  updated_at: new Date()
+                });
+
+                manualInput.value = matchedChannelId;
+                ytStatus.textContent = `Auto-linked: "${matchedTitle}" (${matchedChannelId}) ✅`;
+              } else {
+                ytStatus.textContent = "Channel is already claimed by another user ⚠️";
+              }
             }
           } catch (e) {
             console.warn("Auto channel lookup error:", e);
@@ -185,24 +199,43 @@
       ytBtn.onclick = () => loginWithGoogle();
       ghBtn.onclick = () => loginWithGitHub();
 
-      // Manual Save Button
+      // Manual Link with Strict Uniqueness Validation
       document.getElementById('save-channel-btn').onclick = async () => {
         const chanVal = manualInput.value.trim();
         if (!chanVal) return;
 
         linkMsg.style.color = "#9ca3af";
-        linkMsg.textContent = "Saving to Supabase cloud...";
+        linkMsg.textContent = "Verifying channel availability...";
 
+        // 1. Check if another account already owns this channel
+        const { data: existingUser, error: checkErr } = await supabaseClient
+          .from('profiles')
+          .select('id')
+          .eq('youtube_channel', chanVal)
+          .neq('id', user.id)
+          .maybeSingle();
+
+        if (existingUser) {
+          linkMsg.style.color = "#ef4444";
+          linkMsg.textContent = "❌ This YouTube channel is already linked to another NotShovel account!";
+          return;
+        }
+
+        // 2. Commit to database
         const { error } = await supabaseClient.from('profiles').upsert({
           id: user.id,
           github_username: ghUsername ? ghUsername.toLowerCase() : (cloudProfile ? cloudProfile.github_username : null),
+          google_email: user.email,
+          display_name: meta.full_name || meta.name || ghUsername || user.email.split('@')[0],
           youtube_channel: chanVal,
           updated_at: new Date()
         });
 
         if (error) {
           linkMsg.style.color = "#ef4444";
-          linkMsg.textContent = `Error: ${error.message}`;
+          linkMsg.textContent = error.message.includes("unique") 
+            ? "❌ This YouTube channel is already taken by another account!"
+            : `Error: ${error.message}`;
         } else {
           linkMsg.style.color = "#10b981";
           linkMsg.textContent = "Channel linked successfully! 📺✨";
