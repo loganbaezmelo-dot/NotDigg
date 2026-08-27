@@ -77,13 +77,12 @@
 
   <main class="container">
     
-    <!-- Unified Profile Header Card -->
     <section class="profile-card" id="profile-container">
       <div class="profile-avatar-lg" id="avatar-display">?</div>
       <h1 id="username" style="font-size: 22px; font-weight: 700; margin: 0;">Loading profile...</h1>
       
       <div class="stats-row" id="stats-container">
-        <span>GitHub: <strong id="karma-count">--</strong></span>
+        <span id="gh-stat-box" style="display: none;">GitHub: <strong id="karma-count">--</strong></span>
         <span id="yt-stat-box" style="display: none;">YouTube: <strong id="yt-sub-count">--</strong></span>
       </div>
 
@@ -94,19 +93,16 @@
       </div>
     </section>
 
-    <!-- 1. Merged YouTube Channel Section -->
     <div id="youtube-section-wrapper" style="display: none;">
       <h2 class="section-title" style="color: #f87171;">📺 Linked YouTube Channel</h2>
       <section id="user-youtube-videos" class="feed-list"></section>
     </div>
 
-    <!-- 2. GitHub Repos Section -->
     <div id="github-repos-wrapper" style="display: none;">
       <h2 class="section-title" style="color: #60a5fa;">📦 GitHub Repositories</h2>
       <section id="github-repos" class="feed-list"></section>
     </div>
 
-    <!-- 3. Community Submissions Section -->
     <div id="submissions-wrapper">
       <h2 class="section-title">💬 Community Activity</h2>
       <section id="user-posts" class="feed-list">
@@ -116,22 +112,25 @@
 
   </main>
 
-  <script src="app.js?v=16"></script>
+  <script src="app.js?v=25"></script>
   <script>
     const urlParams = new URLSearchParams(window.location.search);
     let targetUser = urlParams.get('user');
 
     async function initProfilePage() {
-      let sessionUser = null;
+      let activeUser = localStorage.getItem('notshovel_auth_user');
+
       if (supabaseClient) {
-        const { data: { session } } = await supabaseClient.auth.getSession();
-        if (session && session.user) {
-          const meta = session.user.user_metadata || {};
-          sessionUser = meta.user_name || meta.preferred_username || session.user.email.split('@')[0];
+        const { data: { user } } = await supabaseClient.auth.getUser();
+        if (user) {
+          const meta = user.user_metadata || {};
+          const identities = user.identities || [];
+          const ghIdentity = identities.find(i => i.provider === 'github');
+          activeUser = (ghIdentity && ghIdentity.identity_data && (ghIdentity.identity_data.user_name || ghIdentity.identity_data.preferred_username)) 
+                       || meta.user_name || meta.preferred_username || user.email.split('@')[0];
+          localStorage.setItem('notshovel_auth_user', activeUser);
         }
       }
-
-      const activeUser = sessionUser || localStorage.getItem('notshovel_auth_user');
 
       if (!targetUser) {
         targetUser = activeUser;
@@ -142,16 +141,18 @@
         return;
       }
 
-      const isOwnProfile = activeUser && (targetUser.toLowerCase() === activeUser.toLowerCase());
+      const cleanTarget = targetUser.replace(/^@/, '');
+      const isOwnProfile = activeUser && (cleanTarget.toLowerCase() === activeUser.toLowerCase());
       if (isOwnProfile) {
         document.getElementById('owner-actions').style.display = "block";
       }
 
-      loadMergedProfile(targetUser);
+      loadMergedProfile(cleanTarget);
     }
 
     async function loadMergedProfile(userHandle) {
       const avatarEl = document.getElementById('avatar-display');
+      const ghStatBox = document.getElementById('gh-stat-box');
       const karmaEl = document.getElementById('karma-count');
       const ytStatBox = document.getElementById('yt-stat-box');
       const ytSubEl = document.getElementById('yt-sub-count');
@@ -170,6 +171,7 @@
           const ghUser = await ghRes.json();
           avatarEl.style.backgroundImage = `url('${ghUser.avatar_url}')`;
           avatarEl.textContent = "";
+          ghStatBox.style.display = "inline";
           karmaEl.textContent = `${ghUser.public_repos} Repos • ${ghUser.followers} Followers`;
           aboutEl.textContent = ghUser.bio || "Active developer on NotShovel.";
 
@@ -195,44 +197,65 @@
         console.warn("GitHub fetch error:", e);
       }
 
-      // 2. Fetch Public Linked YouTube Channel from Supabase DB
-      let publicChannel = userHandle;
+      // 2. Query Supabase profiles table across multiple possible matches
+      let channelIdentifier = userHandle;
+
       if (supabaseClient) {
         try {
           const { data: dbProfile } = await supabaseClient
             .from('profiles')
             .select('youtube_channel')
-            .ilike('github_username', userHandle)
-            .single();
+            .or(`github_username.ilike.${userHandle},google_email.ilike.${userHandle}%,display_name.ilike.${userHandle}`)
+            .maybeSingle();
 
           if (dbProfile && dbProfile.youtube_channel) {
-            publicChannel = dbProfile.youtube_channel;
+            channelIdentifier = dbProfile.youtube_channel;
           }
-        } catch (dbErr) {
-          console.warn("Supabase lookup error:", dbErr);
+        } catch (err) {
+          console.warn("DB lookup error:", err);
         }
       }
 
+      // 3. Resolve & Render YouTube Channel
       try {
         const apiKey = getYTKey();
-        const chanRes = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&forHandle=${encodeURIComponent(publicChannel)}&key=${apiKey}`);
-        let chanData = await chanRes.json();
+        let chanData = null;
+        const cleanChan = channelIdentifier.trim();
 
-        if (!chanData.items || chanData.items.length === 0) {
-          const searchRes = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(publicChannel)}&type=channel&maxResults=1&key=${apiKey}`);
-          const sData = await searchRes.json();
+        // Strategy A: Direct Channel ID (UC...)
+        if (cleanChan.startsWith("UC")) {
+          const res = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${encodeURIComponent(cleanChan)}&key=${apiKey}`);
+          chanData = await res.json();
+        }
+
+        // Strategy B: Handle lookup (@...)
+        if (!chanData || !chanData.items || chanData.items.length === 0) {
+          const handleQuery = cleanChan.startsWith("@") ? cleanChan : `@${cleanChan}`;
+          const res = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&forHandle=${encodeURIComponent(handleQuery)}&key=${apiKey}`);
+          chanData = await res.json();
+        }
+
+        // Strategy C: Search Fallback
+        if (!chanData || !chanData.items || chanData.items.length === 0) {
+          const sRes = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(cleanChan)}&type=channel&maxResults=1&key=${apiKey}`);
+          const sData = await sRes.json();
           if (sData.items && sData.items.length > 0) {
-            const cId = sData.items[0].snippet.channelId;
-            const fallbackRes = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${cId}&key=${apiKey}`);
-            chanData = await fallbackRes.json();
+            const foundId = sData.items[0].snippet.channelId;
+            const res = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${foundId}&key=${apiKey}`);
+            chanData = await res.json();
           }
         }
 
-        if (chanData.items && chanData.items.length > 0) {
+        if (chanData && chanData.items && chanData.items.length > 0) {
           const chan = chanData.items[0];
           ytStatBox.style.display = "inline";
           ytSubEl.textContent = `${Number(chan.statistics.subscriberCount || 0).toLocaleString()} Subs`;
           ytWrapper.style.display = "block";
+
+          if (!avatarEl.style.backgroundImage || avatarEl.style.backgroundImage === 'none') {
+            avatarEl.style.backgroundImage = `url('${chan.snippet.thumbnails.default.url}')`;
+            avatarEl.textContent = "";
+          }
 
           const vidsRes = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${chan.id}&maxResults=4&order=date&type=video&key=${apiKey}`);
           const vData = await vidsRes.json();
@@ -250,17 +273,20 @@
                 </div>
               </article>
             `).join('');
+          } else {
+            ytContainer.innerHTML = `<p style="color: var(--text-muted); text-align: center;">No video uploads found.</p>`;
           }
         } else {
           ytStatBox.style.display = "none";
           ytWrapper.style.display = "none";
         }
       } catch (err) {
+        console.warn("YouTube channel error:", err);
         ytStatBox.style.display = "none";
         ytWrapper.style.display = "none";
       }
 
-      // 3. Submissions
+      // 4. Submissions
       loadCommunityPosts(userHandle);
     }
 
