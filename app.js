@@ -10,30 +10,54 @@ const supabaseClient = window.supabase
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
 
-// 2. Auth Handlers
+// 2. Auth Handlers & Identity Linkers
 async function loginWithGoogle() {
-  if (supabaseClient) {
+  if (!supabaseClient) return;
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  
+  if (session && session.user) {
+    // User is ALREADY signed in -> Link Google/YouTube to existing account
+    const { error } = await supabaseClient.auth.linkIdentity({
+      provider: "google",
+      options: {
+        redirectTo: window.location.origin + "/settings.html"
+      }
+    });
+    if (error) alert("Google Link Error: " + error.message);
+  } else {
+    // Brand new sign in
     const { error } = await supabaseClient.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: window.location.origin + "/settings.html",
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent',
-        }
+        redirectTo: window.location.origin + "/settings.html"
       }
     });
-    if (error) alert("Google Sign-In error: " + error.message);
+    if (error) alert("Google Sign-In Error: " + error.message);
   }
 }
 
 async function loginWithGitHub() {
-  if (supabaseClient) {
+  if (!supabaseClient) return;
+  const { data: { session } } = await supabaseClient.auth.getSession();
+
+  if (session && session.user) {
+    // User is ALREADY signed in -> Link GitHub to existing account
+    const { error } = await supabaseClient.auth.linkIdentity({
+      provider: "github",
+      options: {
+        redirectTo: window.location.origin + "/settings.html"
+      }
+    });
+    if (error) alert("GitHub Link Error: " + error.message);
+  } else {
+    // Brand new sign in
     const { error } = await supabaseClient.auth.signInWithOAuth({
       provider: "github",
-      options: { redirectTo: window.location.origin + "/settings.html" }
+      options: {
+        redirectTo: window.location.origin + "/settings.html"
+      }
     });
-    if (error) alert("GitHub OAuth error: " + error.message);
+    if (error) alert("GitHub OAuth Error: " + error.message);
   }
 }
 
@@ -61,7 +85,7 @@ async function sendMagicLink(email) {
   return data;
 }
 
-// 3. UI Sync
+// 3. UI Sync (Pulls Identities & Preserves Both Handles)
 async function setupAuthUI() {
   let activeUser = localStorage.getItem("notshovel_auth_user");
   let avatarUrl = null;
@@ -69,10 +93,33 @@ async function setupAuthUI() {
   if (supabaseClient) {
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (session && session.user) {
-      const meta = session.user.user_metadata || {};
-      activeUser = meta.user_name || meta.preferred_username || session.user.email.split("@")[0];
+      const user = session.user;
+      const identities = user.identities || [];
+      
+      const ghIdentity = identities.find(id => id.provider === "github");
+      const googleIdentity = identities.find(id => id.provider === "google");
+
+      if (ghIdentity && ghIdentity.identity_data) {
+        const ghUsername = ghIdentity.identity_data.user_name || ghIdentity.identity_data.preferred_username;
+        if (ghUsername) {
+          activeUser = ghUsername;
+          localStorage.setItem("notshovel_auth_user", ghUsername);
+        }
+      }
+
+      if (googleIdentity && googleIdentity.identity_data) {
+        if (!localStorage.getItem("notshovel_linked_channel")) {
+          const ytName = googleIdentity.identity_data.full_name || googleIdentity.identity_data.name;
+          if (ytName) localStorage.setItem("notshovel_linked_channel", ytName);
+        }
+      }
+
+      const meta = user.user_metadata || {};
+      if (!activeUser) {
+        activeUser = meta.user_name || meta.preferred_username || user.email.split("@")[0];
+        localStorage.setItem("notshovel_auth_user", activeUser);
+      }
       avatarUrl = meta.avatar_url || meta.picture;
-      localStorage.setItem("notshovel_auth_user", activeUser);
     }
   }
 
@@ -261,7 +308,7 @@ function setupSearch() {
   });
 }
 
-// 5. Stories Loader
+// 5. Tech Stories Loader
 async function loadFeed() {
   const container = document.getElementById("feed-list");
   if (!container) return;
