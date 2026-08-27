@@ -10,7 +10,7 @@ const supabaseClient = window.supabase
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
 
-// 2. Auth Handlers (Clean Non-Sensitive OAuth Scopes)
+// 2. Auth Handlers
 async function loginWithGoogle() {
   if (!supabaseClient) return;
 
@@ -437,7 +437,7 @@ async function loadGitHubRecommendations() {
   }
 }
 
-// 7. Trending YouTube Loader
+// 7. Trending YouTube Loader (Fixed Search Relevancy Endpoint)
 async function loadTrendingYouTubeVideos() {
   const container = document.getElementById("youtube-feed-list");
   if (!container) return;
@@ -446,7 +446,7 @@ async function loadTrendingYouTubeVideos() {
 
   try {
     const apiKey = getYTKey();
-    const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&chart=mostPopular&q=software+engineering+web+development+tech&maxResults=5&type=video&key=${apiKey}`);
+    const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&q=programming+tech+software+development&type=video&maxResults=5&key=${apiKey}`);
     const data = await res.json();
 
     if (data.items && data.items.length > 0) {
