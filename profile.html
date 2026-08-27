@@ -84,12 +84,12 @@
       
       <div class="stats-row" id="stats-container">
         <span>GitHub: <strong id="karma-count">--</strong></span>
-        <span>YouTube: <strong id="yt-sub-count">--</strong></span>
+        <span id="yt-stat-box" style="display: none;">YouTube: <strong id="yt-sub-count">--</strong></span>
       </div>
 
       <div class="user-bio" id="user-about"></div>
 
-      <div style="display: flex; gap: 8px; margin-top: 10px;">
+      <div id="owner-actions" style="display: none; margin-top: 10px;">
         <a href="settings.html" class="action-btn" style="font-size: 12px;">⚙️ Manage Integrations</a>
       </div>
     </section>
@@ -116,7 +116,7 @@
 
   </main>
 
-  <script src="app.js?v=13"></script>
+  <script src="app.js?v=15"></script>
   <script>
     const urlParams = new URLSearchParams(window.location.search);
     let targetUser = urlParams.get('user');
@@ -131,8 +131,10 @@
         }
       }
 
+      const activeUser = sessionUser || localStorage.getItem('notshovel_auth_user');
+
       if (!targetUser) {
-        targetUser = sessionUser || localStorage.getItem('notshovel_auth_user');
+        targetUser = activeUser;
       }
 
       if (!targetUser) {
@@ -140,12 +142,18 @@
         return;
       }
 
-      loadMergedProfile(targetUser);
+      const isOwnProfile = activeUser && (targetUser.toLowerCase() === activeUser.toLowerCase());
+      if (isOwnProfile) {
+        document.getElementById('owner-actions').style.display = "block";
+      }
+
+      loadMergedProfile(targetUser, isOwnProfile);
     }
 
-    async function loadMergedProfile(userHandle) {
+    async function loadMergedProfile(userHandle, isOwnProfile) {
       const avatarEl = document.getElementById('avatar-display');
       const karmaEl = document.getElementById('karma-count');
+      const ytStatBox = document.getElementById('yt-stat-box');
       const ytSubEl = document.getElementById('yt-sub-count');
       const aboutEl = document.getElementById('user-about');
       const reposContainer = document.getElementById('github-repos');
@@ -187,16 +195,16 @@
         console.warn("GitHub fetch error:", e);
       }
 
-      // 2. Fetch Linked YouTube Channel
-      const linkedChan = localStorage.getItem('notshovel_linked_channel') || userHandle;
+      // 2. Fetch YouTube Channel (Only use saved channel if viewing YOUR OWN profile)
+      let lookupChannel = isOwnProfile ? (localStorage.getItem('notshovel_linked_channel') || userHandle) : userHandle;
+
       try {
         const apiKey = getYTKey();
-        const chanRes = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&forHandle=${encodeURIComponent(linkedChan)}&key=${apiKey}`);
+        const chanRes = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&forHandle=${encodeURIComponent(lookupChannel)}&key=${apiKey}`);
         let chanData = await chanRes.json();
 
         if (!chanData.items || chanData.items.length === 0) {
-          // Fallback search by query
-          const searchRes = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(linkedChan)}&type=channel&maxResults=1&key=${apiKey}`);
+          const searchRes = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(lookupChannel)}&type=channel&maxResults=1&key=${apiKey}`);
           const sData = await searchRes.json();
           if (sData.items && sData.items.length > 0) {
             const cId = sData.items[0].snippet.channelId;
@@ -207,6 +215,7 @@
 
         if (chanData.items && chanData.items.length > 0) {
           const chan = chanData.items[0];
+          ytStatBox.style.display = "inline";
           ytSubEl.textContent = `${Number(chan.statistics.subscriberCount || 0).toLocaleString()} Subs`;
           ytWrapper.style.display = "block";
 
@@ -228,10 +237,12 @@
             `).join('');
           }
         } else {
-          ytSubEl.textContent = "Not linked";
+          ytStatBox.style.display = "none";
+          ytWrapper.style.display = "none";
         }
       } catch (err) {
-        ytSubEl.textContent = "Not linked";
+        ytStatBox.style.display = "none";
+        ytWrapper.style.display = "none";
       }
 
       // 3. Submissions
