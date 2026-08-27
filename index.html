@@ -34,9 +34,9 @@
       color: #fff;
     }
     .filter-pill.active {
-      background: #2563eb;
-      color: #fff;
-      border-color: #3b82f6;
+      background: #2563eb !important;
+      color: #fff !important;
+      border-color: #3b82f6 !important;
     }
   </style>
 </head>
@@ -99,10 +99,10 @@
 
     <!-- Feed Filter Pills -->
     <div class="filter-bar" id="filter-bar">
-      <button class="filter-pill active" data-filter="all">🌐 All Feeds</button>
-      <button class="filter-pill" data-filter="stories">🔥 Expanded Stories</button>
-      <button class="filter-pill" data-filter="github">📦 Expanded GitHub</button>
-      <button class="filter-pill" data-filter="youtube">📺 Expanded YouTube</button>
+      <button class="filter-pill active" id="pill-all" data-filter="all">🌐 All Feeds</button>
+      <button class="filter-pill" id="pill-stories" data-filter="stories">🔥 Stories</button>
+      <button class="filter-pill" id="pill-github" data-filter="github">📦 GitHub</button>
+      <button class="filter-pill" id="pill-youtube" data-filter="youtube">📺 YouTube</button>
     </div>
 
     <!-- Search Results Feed -->
@@ -120,7 +120,7 @@
       <!-- 1. Stories Section -->
       <div id="section-stories">
         <header class="feed-header">
-          <h1 id="stories-title">Top Tech Stories</h1>
+          <h1>Top Tech Stories</h1>
           <span class="badge">Live Aggregator</span>
         </header>
         <section id="feed-list" class="feed-list"></section>
@@ -129,7 +129,7 @@
       <!-- 2. GitHub Section -->
       <div id="section-github">
         <header class="feed-header" style="margin-top: 36px;">
-          <h1 id="github-title">GitHub Recommendations & Community</h1>
+          <h1>GitHub Recommendations & Community</h1>
           <span class="badge" style="background-color: rgba(16, 185, 129, 0.2); color: #34d399;">Active Projects</span>
         </header>
         <section id="github-feed-list" class="feed-list"></section>
@@ -138,7 +138,7 @@
       <!-- 3. YouTube Section -->
       <div id="section-youtube">
         <header class="feed-header" style="margin-top: 36px;">
-          <h1 id="youtube-title">Trending Tech Videos</h1>
+          <h1>Trending Tech Videos</h1>
           <span class="badge" style="background-color: rgba(239, 68, 68, 0.2); color: #f87171;">YouTube</span>
         </header>
         <section id="youtube-feed-list" class="feed-list"></section>
@@ -148,6 +148,6 @@
 
   </main>
 
-  <script src="app.js?v=26"></script>
+  <script src="app.js?v=28"></script>
 </body>
 </html>
