@@ -10,13 +10,12 @@ const supabaseClient = window.supabase
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
 
-// 2. Auth Handlers & Identity Linkers (With YouTube Read Scope)
+// 2. Auth Handlers (Clean Non-Sensitive OAuth Scopes)
 async function loginWithGoogle() {
   if (!supabaseClient) return;
 
   const options = {
     redirectTo: window.location.origin + "/settings.html",
-    scopes: "https://www.googleapis.com/auth/youtube.readonly",
     queryParams: {
       access_type: 'offline',
       prompt: 'consent'
@@ -26,20 +25,17 @@ async function loginWithGoogle() {
   const { data: { session } } = await supabaseClient.auth.getSession();
   
   if (session && session.user) {
-    // Attempt identity linking if user is already signed in
     const { error } = await supabaseClient.auth.linkIdentity({
       provider: "google",
       options: options
     });
     if (error) {
-      // Fallback if manual linking is disabled in project dashboard
       await supabaseClient.auth.signInWithOAuth({
         provider: "google",
         options: options
       });
     }
   } else {
-    // Direct sign in
     const { error } = await supabaseClient.auth.signInWithOAuth({
       provider: "google",
       options: options
@@ -100,7 +96,7 @@ async function sendMagicLink(email) {
   return data;
 }
 
-// 3. UI Sync (Pulls Identities & Preserves Both Handles)
+// 3. UI Sync
 async function setupAuthUI() {
   let activeUser = localStorage.getItem("notshovel_auth_user");
   let avatarUrl = null;
