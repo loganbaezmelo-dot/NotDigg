@@ -46,28 +46,54 @@
   <!-- Main Content Container -->
   <main class="container">
     
-    <!-- Top Stories Section -->
-    <header class="feed-header">
-      <h1>Top Tech Stories</h1>
-      <span class="badge">Live Aggregator</span>
-    </header>
+    <!-- Real-time Search Box -->
+    <div style="margin-top: 14px; margin-bottom: 20px;">
+      <form id="search-form" style="display: flex; gap: 8px;">
+        <input 
+          type="text" 
+          id="search-input" 
+          placeholder="🔍 Search tech stories, repos, topics..." 
+          style="flex: 1; background: var(--bg-card); border: 1px solid var(--border-color); color: #fff; padding: 10px 14px; border-radius: 8px; font-size: 14px; outline: none;"
+        />
+        <button type="submit" class="action-btn" style="background: var(--bg-card-hover); color: var(--text-main); border: 1px solid var(--border-color); padding: 10px 16px; border-radius: 8px; font-size: 14px; cursor: pointer;">
+          Search
+        </button>
+      </form>
+    </div>
 
-    <section id="feed-list" class="feed-list">
-      <!-- Injected via app.js -->
-    </section>
+    <!-- Search Results Feed (Hidden by default) -->
+    <div id="search-results-section" style="display: none; margin-bottom: 30px;">
+      <header class="feed-header">
+        <h1 id="search-header-title">Search Results</h1>
+        <button id="clear-search-btn" class="action-btn" style="font-size: 12px; padding: 4px 8px; cursor: pointer;">Clear Search ✕</button>
+      </header>
+      <section id="search-feed-list" class="feed-list"></section>
+    </div>
 
-    <!-- GitHub Community & Spotlight Section -->
-    <header class="feed-header" style="margin-top: 36px;">
-      <h1>GitHub Recommendations & Community</h1>
-      <span class="badge" style="background-color: rgba(16, 185, 129, 0.2); color: #34d399;">Active Projects</span>
-    </header>
+    <!-- Main Live Stories Area -->
+    <div id="default-feeds">
+      <header class="feed-header">
+        <h1>Top Tech Stories</h1>
+        <span class="badge">Live Aggregator</span>
+      </header>
 
-    <section id="github-feed-list" class="feed-list">
-      <!-- Injected via app.js -->
-    </section>
+      <section id="feed-list" class="feed-list">
+        <!-- Injected via app.js -->
+      </section>
+
+      <!-- GitHub Recommendations Section -->
+      <header class="feed-header" style="margin-top: 36px;">
+        <h1>GitHub Recommendations & Community</h1>
+        <span class="badge" style="background-color: rgba(16, 185, 129, 0.2); color: #34d399;">Active Projects</span>
+      </header>
+
+      <section id="github-feed-list" class="feed-list">
+        <!-- Injected via app.js -->
+      </section>
+    </div>
 
   </main>
 
-  <script src="app.js?v=9"></script>
+  <script src="app.js?v=10"></script>
 </body>
 </html>
