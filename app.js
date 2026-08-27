@@ -96,10 +96,11 @@ async function sendMagicLink(email) {
   return data;
 }
 
-// 3. UI Sync
+// 3. UI Sync (With Custom YouTube / High-Res PFP Priority)
 async function setupAuthUI() {
   let activeUser = localStorage.getItem("notshovel_auth_user");
-  let avatarUrl = null;
+  // Check cached custom YouTube avatar first
+  let avatarUrl = localStorage.getItem("notshovel_custom_avatar") || null;
 
   if (supabaseClient) {
     const { data: { session } } = await supabaseClient.auth.getSession();
@@ -130,7 +131,43 @@ async function setupAuthUI() {
         activeUser = meta.user_name || meta.preferred_username || user.email.split("@")[0];
         localStorage.setItem("notshovel_auth_user", activeUser);
       }
-      avatarUrl = meta.avatar_url || meta.picture;
+
+      // If no custom YouTube PFP is cached yet, fetch from Supabase linked channel
+      if (!avatarUrl) {
+        try {
+          const { data: profile } = await supabaseClient
+            .from("profiles")
+            .select("youtube_channel")
+            .or(`github_username.ilike.${activeUser},google_email.ilike.${activeUser}%,display_name.ilike.${activeUser}`)
+            .maybeSingle();
+
+          if (profile && profile.youtube_channel) {
+            const apiKey = getYTKey();
+            const cleanChan = profile.youtube_channel.trim();
+            let cUrl = `https://www.googleapis.com/youtube/v3/channels?part=snippet&key=${apiKey}`;
+            if (cleanChan.startsWith("UC")) {
+              cUrl += `&id=${encodeURIComponent(cleanChan)}`;
+            } else {
+              cUrl += `&forHandle=${encodeURIComponent(cleanChan.startsWith("@") ? cleanChan : "@" + cleanChan)}`;
+            }
+
+            const cRes = await fetch(cUrl);
+            const cData = await cRes.json();
+            if (cData.items && cData.items.length > 0) {
+              const snip = cData.items[0].snippet;
+              avatarUrl = snip.thumbnails.high ? snip.thumbnails.high.url : snip.thumbnails.default.url;
+              localStorage.setItem("notshovel_custom_avatar", avatarUrl);
+            }
+          }
+        } catch (e) {
+          console.warn("Avatar sync error:", e);
+        }
+      }
+
+      // Fallback if no YouTube channel exists
+      if (!avatarUrl) {
+        avatarUrl = meta.avatar_url || meta.picture;
+      }
     }
   }
 
@@ -143,8 +180,10 @@ async function setupAuthUI() {
     });
     navAvatars.forEach(av => {
       if (avatarUrl) {
+        av.textContent = "";
         av.style.backgroundImage = `url('${avatarUrl}')`;
         av.style.backgroundSize = "cover";
+        av.style.backgroundPosition = "center";
       } else {
         av.textContent = activeUser.slice(0, 2).toUpperCase();
         av.style.display = "flex";
@@ -449,7 +488,6 @@ async function loadTrendingYouTubeVideos(limit = 5) {
 
   try {
     const apiKey = getYTKey();
-    // VideoCategoryId 28 = Science & Tech; chart=mostPopular costs ONLY 1 quota unit instead of 100!
     const res = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&chart=mostPopular&videoCategoryId=28&maxResults=${limit}&key=${apiKey}`);
     const data = await res.json();
 
@@ -487,7 +525,7 @@ async function loadTrendingYouTubeVideos(limit = 5) {
   }
 }
 
-// 8. Layout Filter System (Takes Over Full Page When Clicked)
+// 8. Layout Filter System
 function setupFeedFilters() {
   const pills = document.querySelectorAll(".filter-pill");
   const secStories = document.getElementById("section-stories");
