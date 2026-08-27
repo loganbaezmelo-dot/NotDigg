@@ -100,7 +100,7 @@ function setupSidebar() {
   if (backdrop) backdrop.addEventListener("click", closeDrawer);
 }
 
-// 5. Global Search Engine (HN Stories + GitHub Repos)
+// 5. Global 3-Way Search (User Profiles + Repos + Stories)
 function setupSearch() {
   const form = document.getElementById("search-form");
   const input = document.getElementById("search-input");
@@ -122,26 +122,53 @@ function setupSearch() {
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const query = input.value.trim();
-    if (!query) return;
+    const rawQuery = input.value.trim();
+    if (!rawQuery) return;
+
+    const cleanHandle = rawQuery.replace(/^@/, "").trim();
 
     defaultFeeds.style.display = "none";
     resultsSection.style.display = "block";
-    title.textContent = `Search: "${query}"`;
-    resultsList.innerHTML = `<p style="color: #9ca3af; text-align: center;">Searching NotShovel network... 🔍</p>`;
+    title.textContent = `Search: "${rawQuery}"`;
+    resultsList.innerHTML = `<p style="color: #9ca3af; text-align: center;">Searching profiles, repos, and stories... 🔍</p>`;
 
     try {
-      const [hnRes, ghRes] = await Promise.all([
-        fetch(`https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(query)}&tags=story&hitsPerPage=6`),
-        fetch(`https://api.github.com/search/repositories?q=${encodeURIComponent(query)}&sort=stars&order=desc&per_page=4`)
+      const [userRes, ghRes, hnRes] = await Promise.all([
+        fetch(`https://api.github.com/users/${encodeURIComponent(cleanHandle)}`),
+        fetch(`https://api.github.com/search/repositories?q=${encodeURIComponent(rawQuery)}&sort=stars&order=desc&per_page=4`),
+        fetch(`https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(rawQuery)}&tags=story&hitsPerPage=4`)
       ]);
 
-      const hnData = await hnRes.json();
+      const ghUser = userRes.ok ? await userRes.json() : null;
       const ghData = await ghRes.json();
+      const hnData = await hnRes.json();
 
       let cardsHtml = "";
 
-      // GitHub Results
+      // 1. Direct User Profile Match
+      if (ghUser && ghUser.login) {
+        cardsHtml += `
+          <article class="card" style="border-left: 3px solid #3b82f6;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <img src="${ghUser.avatar_url}" alt="${ghUser.login}" style="width: 32px; height: 32px; border-radius: 50%;" />
+                <div>
+                  <a href="profile.html?user=${ghUser.login}" class="meta-link" style="font-weight: 700; font-size: 15px; color: #fff;">@${ghUser.login}</a>
+                  <p style="font-size: 12px; color: var(--text-muted);">${ghUser.name || 'Developer'}</p>
+                </div>
+              </div>
+              <span class="badge" style="background: rgba(59, 130, 246, 0.2); color: #60a5fa;">User Profile</span>
+            </div>
+            <p class="card-snippet" style="margin-top: 8px;">${ghUser.bio || "Active developer profile on NotShovel."}</p>
+            <div class="card-footer">
+              <span>${ghUser.public_repos} Repos • ${ghUser.followers} Followers</span>
+              <a href="profile.html?user=${ghUser.login}" class="meta-link">View NotShovel Profile →</a>
+            </div>
+          </article>
+        `;
+      }
+
+      // 2. GitHub Repositories
       if (ghData.items && ghData.items.length > 0) {
         cardsHtml += ghData.items.map(repo => `
           <article class="card">
@@ -164,14 +191,14 @@ function setupSearch() {
         `).join("");
       }
 
-      // Tech Story Results
+      // 3. Tech Stories & Discussions
       if (hnData.hits && hnData.hits.length > 0) {
         cardsHtml += hnData.hits.map(item => {
           const storyUrl = item.url || `comments.html?id=${item.objectID}`;
           return `
             <article class="card">
               <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span class="badge" style="background: rgba(59, 130, 246, 0.2); color: #60a5fa;">Story</span>
+                <span class="badge" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24;">Story</span>
               </div>
               <a href="${storyUrl}" target="_blank" rel="noopener noreferrer" class="card-title">
                 ${item.title}
@@ -187,7 +214,7 @@ function setupSearch() {
       }
 
       if (!cardsHtml) {
-        resultsList.innerHTML = `<p style="color: var(--text-muted); text-align: center;">No matching tech stories or repositories found 😭</p>`;
+        resultsList.innerHTML = `<p style="color: var(--text-muted); text-align: center;">No matching profiles, stories, or repositories found 😭</p>`;
       } else {
         resultsList.innerHTML = cardsHtml;
       }
@@ -198,7 +225,7 @@ function setupSearch() {
   });
 }
 
-// 6. Live Tech Stories Loader
+// 6. Live Tech Stories Loader (Hacker News)
 async function loadFeed() {
   const container = document.getElementById("feed-list");
   if (!container) return;
@@ -254,6 +281,7 @@ async function loadGitHubRecommendations() {
     let feedRepos = [];
     const activeUser = localStorage.getItem("notshovel_auth_user");
 
+    // Spotlight logged-in user repo
     if (activeUser) {
       try {
         const userRepoRes = await fetch(`https://api.github.com/users/${activeUser}/repos?sort=pushed&per_page=1`);
@@ -268,6 +296,7 @@ async function loadGitHubRecommendations() {
       }
     }
 
+    // Trending repos across GitHub
     const searchRes = await fetch(
       "https://api.github.com/search/repositories?q=stars:>100+pushed:>2026-01-01&sort=stars&order=desc&per_page=6"
     );
