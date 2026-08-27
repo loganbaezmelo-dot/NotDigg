@@ -100,7 +100,105 @@ function setupSidebar() {
   if (backdrop) backdrop.addEventListener("click", closeDrawer);
 }
 
-// 5. Live Tech Stories Loader (Hacker News)
+// 5. Global Search Engine (HN Stories + GitHub Repos)
+function setupSearch() {
+  const form = document.getElementById("search-form");
+  const input = document.getElementById("search-input");
+  const resultsSection = document.getElementById("search-results-section");
+  const resultsList = document.getElementById("search-feed-list");
+  const defaultFeeds = document.getElementById("default-feeds");
+  const clearBtn = document.getElementById("clear-search-btn");
+  const title = document.getElementById("search-header-title");
+
+  if (!form || !input) return;
+
+  function resetSearch() {
+    input.value = "";
+    resultsSection.style.display = "none";
+    defaultFeeds.style.display = "block";
+  }
+
+  if (clearBtn) clearBtn.onclick = resetSearch;
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const query = input.value.trim();
+    if (!query) return;
+
+    defaultFeeds.style.display = "none";
+    resultsSection.style.display = "block";
+    title.textContent = `Search: "${query}"`;
+    resultsList.innerHTML = `<p style="color: #9ca3af; text-align: center;">Searching NotShovel network... 🔍</p>`;
+
+    try {
+      const [hnRes, ghRes] = await Promise.all([
+        fetch(`https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(query)}&tags=story&hitsPerPage=6`),
+        fetch(`https://api.github.com/search/repositories?q=${encodeURIComponent(query)}&sort=stars&order=desc&per_page=4`)
+      ]);
+
+      const hnData = await hnRes.json();
+      const ghData = await ghRes.json();
+
+      let cardsHtml = "";
+
+      // GitHub Results
+      if (ghData.items && ghData.items.length > 0) {
+        cardsHtml += ghData.items.map(repo => `
+          <article class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <img src="${repo.owner.avatar_url}" alt="${repo.owner.login}" style="width: 22px; height: 22px; border-radius: 50%;" />
+                <a href="profile.html?user=${repo.owner.login}" class="meta-link" style="font-weight: 600;">@${repo.owner.login}</a>
+              </div>
+              <span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #34d399;">GitHub Repo</span>
+            </div>
+            <a href="${repo.html_url}" target="_blank" rel="noopener noreferrer" class="card-title">
+              📦 ${repo.name}
+            </a>
+            <p class="card-snippet">${repo.description || "No description provided."}</p>
+            <div class="card-footer">
+              <span>⭐ ${repo.stargazers_count.toLocaleString()} stars • 🍴 ${repo.forks_count.toLocaleString()} forks</span>
+              <a href="${repo.html_url}" target="_blank" rel="noopener noreferrer" class="meta-link">View Repo ↗</a>
+            </div>
+          </article>
+        `).join("");
+      }
+
+      // Tech Story Results
+      if (hnData.hits && hnData.hits.length > 0) {
+        cardsHtml += hnData.hits.map(item => {
+          const storyUrl = item.url || `comments.html?id=${item.objectID}`;
+          return `
+            <article class="card">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span class="badge" style="background: rgba(59, 130, 246, 0.2); color: #60a5fa;">Story</span>
+              </div>
+              <a href="${storyUrl}" target="_blank" rel="noopener noreferrer" class="card-title">
+                ${item.title}
+              </a>
+              <p class="card-snippet">Discussion with ${item.num_comments || 0} comments and ${item.points || 0} points.</p>
+              <div class="card-footer">
+                <span>Posted by <a href="profile.html?user=${item.author}" class="meta-link">@${item.author}</a></span>
+                <a href="comments.html?id=${item.objectID}" class="meta-link">Comments (${item.num_comments || 0}) →</a>
+              </div>
+            </article>
+          `;
+        }).join("");
+      }
+
+      if (!cardsHtml) {
+        resultsList.innerHTML = `<p style="color: var(--text-muted); text-align: center;">No matching tech stories or repositories found 😭</p>`;
+      } else {
+        resultsList.innerHTML = cardsHtml;
+      }
+
+    } catch (err) {
+      resultsList.innerHTML = `<p style="color: #ef4444; text-align: center;">Search failed: ${err.message} 😭</p>`;
+    }
+  });
+}
+
+// 6. Live Tech Stories Loader
 async function loadFeed() {
   const container = document.getElementById("feed-list");
   if (!container) return;
@@ -145,7 +243,7 @@ async function loadFeed() {
   }
 }
 
-// 6. Real Dynamic GitHub Recommendation Engine (Trending + Active User Spotlight)
+// 7. Dynamic GitHub Recommendations Loader
 async function loadGitHubRecommendations() {
   const container = document.getElementById("github-feed-list");
   if (!container) return;
@@ -156,7 +254,6 @@ async function loadGitHubRecommendations() {
     let feedRepos = [];
     const activeUser = localStorage.getItem("notshovel_auth_user");
 
-    // 1. If user is authenticated, spotlight their latest pushed repo first
     if (activeUser) {
       try {
         const userRepoRes = await fetch(`https://api.github.com/users/${activeUser}/repos?sort=pushed&per_page=1`);
@@ -171,7 +268,6 @@ async function loadGitHubRecommendations() {
       }
     }
 
-    // 2. Query real-time top starred repositories on GitHub
     const searchRes = await fetch(
       "https://api.github.com/search/repositories?q=stars:>100+pushed:>2026-01-01&sort=stars&order=desc&per_page=6"
     );
@@ -189,7 +285,6 @@ async function loadGitHubRecommendations() {
       return;
     }
 
-    // 3. Render real recommendations cards
     container.innerHTML = feedRepos.map(repo => {
       const isUserRepo = activeUser && repo.owner.login.toLowerCase() === activeUser.toLowerCase();
       
@@ -221,10 +316,11 @@ async function loadGitHubRecommendations() {
   }
 }
 
-// Init on Load
+// Init
 document.addEventListener("DOMContentLoaded", () => {
   setupSidebar();
   setupAuthUI();
+  setupSearch();
   loadFeed();
   loadGitHubRecommendations();
 });
