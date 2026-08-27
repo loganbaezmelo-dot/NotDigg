@@ -80,7 +80,7 @@
 
       try {
         const apiKey = getYTKey();
-        const res = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${channelId}&key=${apiKey}`);
+        const res = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,contentDetails&id=${encodeURIComponent(channelId)}&key=${apiKey}`);
         const data = await res.json();
 
         if (data.items && data.items.length > 0) {
@@ -96,32 +96,46 @@
           document.getElementById('chan-views').textContent = Number(stats.viewCount || 0).toLocaleString();
           document.getElementById('chan-desc').textContent = snip.description || "No channel description available.";
 
-          loadChannelVideos(apiKey);
+          // Resolve uploads playlist ID (1 unit)
+          let uploadsPlaylistId = chan.contentDetails && chan.contentDetails.relatedPlaylists && chan.contentDetails.relatedPlaylists.uploads;
+          if (!uploadsPlaylistId && channelId.startsWith("UC")) {
+            uploadsPlaylistId = "UU" + channelId.substring(2);
+          }
+
+          loadChannelVideos(uploadsPlaylistId, apiKey);
         }
       } catch (err) {
         document.getElementById('chan-title').textContent = "Failed to load channel details.";
       }
     }
 
-    async function loadChannelVideos(apiKey) {
+    async function loadChannelVideos(uploadsPlaylistId, apiKey) {
       const vidsContainer = document.getElementById('channel-videos');
+      if (!uploadsPlaylistId) {
+        vidsContainer.innerHTML = `<p style="color: var(--text-muted); text-align: center;">No uploads found.</p>`;
+        return;
+      }
+
       try {
-        const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&maxResults=8&order=date&type=video&key=${apiKey}`);
+        // 1 Quota unit instead of 100!
+        const res = await fetch(`https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${encodeURIComponent(uploadsPlaylistId)}&maxResults=8&key=${apiKey}`);
         const data = await res.json();
 
         if (data.items && data.items.length > 0) {
-          vidsContainer.innerHTML = data.items.map(v => `
-            <article class="card">
-              <a href="video.html?v=${v.id.videoId}" class="card-title">
-                ▶️ ${v.snippet.title}
-              </a>
-              <p class="card-snippet">${v.snippet.description || "No description."}</p>
-              <div class="card-footer">
-                <span>Published ${new Date(v.snippet.publishedAt).toLocaleDateString()}</span>
-                <a href="video.html?v=${v.id.videoId}" class="meta-link" style="color: #ef4444;">Watch Video →</a>
-              </div>
-            </article>
-          `).join('');
+          vidsContainer.innerHTML = data.items
+            .filter(v => v.snippet && v.snippet.resourceId && v.snippet.resourceId.videoId)
+            .map(v => `
+              <article class="card">
+                <a href="video.html?v=${v.snippet.resourceId.videoId}" class="card-title">
+                  ▶️ ${v.snippet.title}
+                </a>
+                <p class="card-snippet">${v.snippet.description || "No description provided."}</p>
+                <div class="card-footer">
+                  <span>Published ${new Date(v.snippet.publishedAt).toLocaleDateString()}</span>
+                  <a href="video.html?v=${v.snippet.resourceId.videoId}" class="meta-link" style="color: #ef4444;">Watch Video →</a>
+                </div>
+              </article>
+            `).join('');
         } else {
           vidsContainer.innerHTML = `<p style="color: var(--text-muted); text-align: center;">No videos found.</p>`;
         }
