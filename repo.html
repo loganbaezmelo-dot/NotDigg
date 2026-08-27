@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Repository View | NotShovel</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    .repo-header {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px;
+      margin-top: 15px;
+      margin-bottom: 20px;
+    }
+    .repo-stats {
+      display: flex;
+      gap: 16px;
+      margin-top: 10px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+    .readme-box {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 24px;
+      color: #e5e7eb;
+      line-height: 1.6;
+      word-break: break-word;
+    }
+    .readme-box pre {
+      background: #121214;
+      padding: 12px;
+      border-radius: 8px;
+      overflow-x: auto;
+      border: 1px solid var(--border-color);
+    }
+    .readme-box code {
+      font-family: monospace;
+      color: #93c5fd;
+    }
+    .readme-box a {
+      color: #3b82f6;
+      text-decoration: underline;
+    }
+    .readme-box img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+<body>
+
+  <header class="navbar">
+    <div class="nav-left">
+      <a href="index.html" class="logo">notshovel</a>
+    </div>
+    <div class="nav-right">
+      <a href="index.html" class="meta-link" style="color: white;">← Back to feed</a>
+    </div>
+  </header>
+
+  <main class="container">
+    
+    <!-- Repository Details Header -->
+    <div class="repo-header" id="repo-header">
+      <h1 id="repo-title" style="font-size: 20px; font-weight: 700;">Loading repository...</h1>
+      <p id="repo-desc" style="color: var(--text-muted); font-size: 14px; margin-top: 6px;"></p>
+      <div class="repo-stats" id="repo-stats"></div>
+      <div style="margin-top: 14px;">
+        <a id="external-gh-link" href="#" target="_blank" rel="noopener noreferrer" class="meta-link" style="color: #60a5fa; font-size: 13px;">
+          View on GitHub (External) ↗
+        </a>
+      </div>
+    </div>
+
+    <!-- In-App README Viewer -->
+    <h2 style="font-size: 16px; font-weight: 700; margin-bottom: 12px; color: var(--text-main);">📄 README.md</h2>
+    <section class="readme-box" id="readme-content">
+      <p style="color: var(--text-muted); text-align: center;">Fetching README...</p>
+    </section>
+
+  </main>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const owner = urlParams.get('owner');
+    const repo = urlParams.get('repo');
+
+    async function loadRepoViewer() {
+      const titleEl = document.getElementById('repo-title');
+      const descEl = document.getElementById('repo-desc');
+      const statsEl = document.getElementById('repo-stats');
+      const readmeEl = document.getElementById('readme-content');
+      const externalLink = document.getElementById('external-gh-link');
+
+      if (!owner || !repo) {
+        titleEl.textContent = "No repository specified.";
+        readmeEl.innerHTML = `<p style="color: #ef4444; text-align: center;">Missing repository parameters 😭</p>`;
+        return;
+      }
+
+      titleEl.textContent = `📦 ${owner} / ${repo}`;
+      externalLink.href = `https://github.com/${owner}/${repo}`;
+
+      // 1. Fetch Repository Metadata
+      try {
+        const repoRes = await fetch(`https://api.github.com/repos/${owner}/${repo}`);
+        if (repoRes.ok) {
+          const data = await repoRes.json();
+          descEl.textContent = data.description || "No description provided.";
+          statsEl.innerHTML = `
+            <span>⭐ <strong>${data.stargazers_count.toLocaleString()}</strong> stars</span>
+            <span>🍴 <strong>${data.forks_count.toLocaleString()}</strong> forks</span>
+            <span>👀 <strong>${data.subscribers_count || 0}</strong> watchers</span>
+            <span>Default branch: <strong>${data.default_branch}</strong></span>
+          `;
+        }
+      } catch (e) {
+        console.warn("Could not fetch repo metadata", e);
+      }
+
+      // 2. Fetch and render README
+      try {
+        const readmeRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/readme`, {
+          headers: { "Accept": "application/vnd.github.v3.raw" }
+        });
+
+        if (readmeRes.ok) {
+          const markdownText = await readmeRes.text();
+          readmeEl.innerHTML = marked.parse(markdownText);
+        } else {
+          readmeEl.innerHTML = `<p style="color: var(--text-muted); text-align: center;">No README.md found in this repository.</p>`;
+        }
+      } catch (err) {
+        readmeEl.innerHTML = `<p style="color: #ef4444; text-align: center;">Failed to load README: ${err.message} 😭</p>`;
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadRepoViewer);
+  </script>
+</body>
+</html>
