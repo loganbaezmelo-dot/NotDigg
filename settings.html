@@ -46,7 +46,7 @@
     <section class="settings-card">
       <h2 style="font-size: 16px; font-weight: 700; margin: 0 0 12px 0;">Connected Integrations</h2>
       <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 18px;">
-        Connect platforms to permanently merge your GitHub repositories and YouTube channel into one unified public profile.
+        Connecting your accounts automatically detects your public YouTube channel and merges it with your GitHub repositories.
       </p>
 
       <!-- Google / YouTube Integration -->
@@ -55,7 +55,7 @@
           <span class="int-icon">📺</span>
           <div>
             <h3 style="font-size: 15px; margin: 0; color: #fff;">Google & YouTube</h3>
-            <p id="yt-status-text" style="font-size: 12px; color: var(--text-muted); margin: 4px 0 0 0;">Checking link status...</p>
+            <p id="yt-status-text" style="font-size: 12px; color: var(--text-muted); margin: 4px 0 0 0;">Checking channel status...</p>
           </div>
         </div>
         <button id="connect-yt-btn" class="action-btn" style="border-color: #ef4444; color: #f87171;">
@@ -77,15 +77,15 @@
         </button>
       </div>
 
-      <!-- Global Public YouTube Channel Link -->
+      <!-- Channel Details Display / Fallback -->
       <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-color);">
-        <h4 style="font-size: 14px; margin: 0 0 8px 0;">Public YouTube Channel Handle / ID</h4>
+        <h4 style="font-size: 14px; margin: 0 0 8px 0;">Active Linked Channel</h4>
         <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">
-          Saved to Supabase database so everyone sees your channel attached to your @GitHub profile:
+          Automatically resolved from your Google login or manually entered:
         </p>
         <div style="display: flex; gap: 8px;">
-          <input type="text" id="manual-channel-input" class="auth-input" style="flex: 1; background: #121214; border: 1px solid var(--border-color); color: #fff; padding: 8px 12px; border-radius: 8px; font-size: 13px;" placeholder="e.g. @YourHandle or UCxxxxxxxx" />
-          <button id="save-channel-btn" class="action-btn">Save to Cloud</button>
+          <input type="text" id="manual-channel-input" class="auth-input" style="flex: 1; background: #121214; border: 1px solid var(--border-color); color: #fff; padding: 8px 12px; border-radius: 8px; font-size: 13px;" placeholder="Auto-detecting channel..." />
+          <button id="save-channel-btn" class="action-btn">Update Channel</button>
         </div>
         <p id="link-msg" style="font-size: 12px; margin-top: 6px;"></p>
       </div>
@@ -96,7 +96,7 @@
     </div>
   </main>
 
-  <script src="app.js?v=17"></script>
+  <script src="app.js?v=20"></script>
   <script>
     async function initSettings() {
       const ytBtn = document.getElementById('connect-yt-btn');
@@ -108,21 +108,18 @@
 
       if (!supabaseClient) return;
 
-      // 1. Fetch fresh authenticated user object directly from Supabase server
-      const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-
-      if (!user || userError) {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session || !session.user) {
         window.location.href = "login.html";
         return;
       }
 
+      const user = session.user;
       const meta = user.user_metadata || {};
       const identities = user.identities || [];
 
-      // Check for GitHub and Google/YouTube identities
+      // Detect GitHub
       const ghIdentity = identities.find(i => i.provider === 'github') || (user.app_metadata.provider === 'github' ? { identity_data: meta } : null);
-      const googleIdentity = identities.find(i => i.provider === 'google') || (user.app_metadata.provider === 'google' ? { identity_data: meta } : null);
-
       let ghUsername = (ghIdentity && ghIdentity.identity_data && (ghIdentity.identity_data.user_name || ghIdentity.identity_data.preferred_username)) 
                        || meta.user_name || meta.preferred_username;
 
@@ -131,36 +128,59 @@
         ghBtn.textContent = "Connected ✅";
         ghBtn.style.color = "#10b981";
         ghBtn.style.borderColor = "#10b981";
-      } else {
-        ghStatus.textContent = "Not connected";
       }
 
-      if (googleIdentity) {
-        const emailOrName = (googleIdentity.identity_data && (googleIdentity.identity_data.full_name || googleIdentity.identity_data.email)) || user.email;
-        ytStatus.textContent = `Connected via Google (${emailOrName}) ✅`;
-        ytBtn.textContent = "Connected ✅";
-        ytBtn.style.color = "#10b981";
-        ytBtn.style.borderColor = "#10b981";
-      } else {
-        ytStatus.textContent = "Not connected";
-      }
-
-      // 2. Check Database Cloud Profile
-      const { data: cloudProfile } = await supabaseClient
+      // Check current Supabase Cloud Profile
+      let { data: cloudProfile } = await supabaseClient
         .from('profiles')
         .select('*')
         .eq('id', user.id)
         .maybeSingle();
 
+      // Check for Google OAuth Provider Token to auto-query YouTube channel
+      const providerToken = session.provider_token;
+      if (providerToken && (!cloudProfile || !cloudProfile.youtube_channel)) {
+        try {
+          ytStatus.textContent = "Detecting YouTube channel from Google token... 🔍";
+          const res = await fetch("https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&mine=true", {
+            headers: { "Authorization": `Bearer ${providerToken}` }
+          });
+          const ytRes = await res.json();
+          if (ytRes.items && ytRes.items.length > 0) {
+            const detectedChannelId = ytRes.items[0].id;
+            const channelTitle = ytRes.items[0].snippet.title;
+
+            // Auto-persist directly into Supabase
+            await supabaseClient.from('profiles').upsert({
+              id: user.id,
+              github_username: ghUsername ? ghUsername.toLowerCase() : null,
+              youtube_channel: detectedChannelId,
+              updated_at: new Date()
+            });
+
+            manualInput.value = detectedChannelId;
+            ytStatus.textContent = `Detected & Linked: "${channelTitle}" (${detectedChannelId}) ✅`;
+            ytBtn.textContent = "Connected ✅";
+            ytBtn.style.color = "#10b981";
+            ytBtn.style.borderColor = "#10b981";
+          }
+        } catch (e) {
+          console.warn("Could not auto-fetch channel from provider token:", e);
+        }
+      }
+
       if (cloudProfile && cloudProfile.youtube_channel) {
         manualInput.value = cloudProfile.youtube_channel;
-        ytStatus.textContent = `Linked channel: ${cloudProfile.youtube_channel} (Public) ✅`;
+        ytStatus.textContent = `Linked channel: ${cloudProfile.youtube_channel} ✅`;
+        ytBtn.textContent = "Connected ✅";
+        ytBtn.style.color = "#10b981";
+        ytBtn.style.borderColor = "#10b981";
       }
 
       ytBtn.onclick = () => loginWithGoogle();
       ghBtn.onclick = () => loginWithGitHub();
 
-      // 3. Save to Supabase DB Cloud
+      // Manual Override / Update
       document.getElementById('save-channel-btn').onclick = async () => {
         const chanVal = manualInput.value.trim();
         if (!chanVal) return;
@@ -168,24 +188,20 @@
         linkMsg.style.color = "#9ca3af";
         linkMsg.textContent = "Saving to Supabase cloud...";
 
-        const payload = {
+        const { error } = await supabaseClient.from('profiles').upsert({
           id: user.id,
           github_username: ghUsername ? ghUsername.toLowerCase() : (cloudProfile ? cloudProfile.github_username : null),
           youtube_channel: chanVal,
           updated_at: new Date()
-        };
-
-        const { error } = await supabaseClient
-          .from('profiles')
-          .upsert(payload);
+        });
 
         if (error) {
           linkMsg.style.color = "#ef4444";
           linkMsg.textContent = `Error: ${error.message}`;
         } else {
           linkMsg.style.color = "#10b981";
-          linkMsg.textContent = "Public profile merged and saved to database! 📺✨";
-          ytStatus.textContent = `Linked channel: ${chanVal} (Public) ✅`;
+          linkMsg.textContent = "Profile updated! 📺✨";
+          ytStatus.textContent = `Linked channel: ${chanVal} ✅`;
         }
       };
 
