@@ -46,10 +46,9 @@
     <section class="settings-card">
       <h2 style="font-size: 16px; font-weight: 700; margin: 0 0 12px 0;">Connected Integrations</h2>
       <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 18px;">
-        Connecting your accounts automatically detects your public YouTube channel and merges it with your GitHub repositories.
+        Connect platforms to permanently merge your GitHub repositories and YouTube channel into one unified public profile.
       </p>
 
-      <!-- Google / YouTube Integration -->
       <div class="integration-row">
         <div class="int-info">
           <span class="int-icon">📺</span>
@@ -63,7 +62,6 @@
         </button>
       </div>
 
-      <!-- GitHub Integration -->
       <div class="integration-row">
         <div class="int-info">
           <span class="int-icon">🐙</span>
@@ -77,15 +75,14 @@
         </button>
       </div>
 
-      <!-- Channel Details Display / Fallback -->
       <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-color);">
-        <h4 style="font-size: 14px; margin: 0 0 8px 0;">Active Linked Channel</h4>
+        <h4 style="font-size: 14px; margin: 0 0 8px 0;">Active Linked YouTube Channel</h4>
         <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">
-          Automatically resolved from your Google login or manually entered:
+          Saved to Supabase database so everyone sees your channel attached to your profile:
         </p>
         <div style="display: flex; gap: 8px;">
-          <input type="text" id="manual-channel-input" class="auth-input" style="flex: 1; background: #121214; border: 1px solid var(--border-color); color: #fff; padding: 8px 12px; border-radius: 8px; font-size: 13px;" placeholder="Auto-detecting channel..." />
-          <button id="save-channel-btn" class="action-btn">Update Channel</button>
+          <input type="text" id="manual-channel-input" class="auth-input" style="flex: 1; background: #121214; border: 1px solid var(--border-color); color: #fff; padding: 8px 12px; border-radius: 8px; font-size: 13px;" placeholder="e.g. @YourChannel or UCxxxxxxxx" />
+          <button id="save-channel-btn" class="action-btn">Save to Cloud</button>
         </div>
         <p id="link-msg" style="font-size: 12px; margin-top: 6px;"></p>
       </div>
@@ -96,7 +93,7 @@
     </div>
   </main>
 
-  <script src="app.js?v=20"></script>
+  <script src="app.js?v=21"></script>
   <script>
     async function initSettings() {
       const ytBtn = document.getElementById('connect-yt-btn');
@@ -128,6 +125,8 @@
         ghBtn.textContent = "Connected ✅";
         ghBtn.style.color = "#10b981";
         ghBtn.style.borderColor = "#10b981";
+      } else {
+        ghStatus.textContent = "Not connected";
       }
 
       // Check current Supabase Cloud Profile
@@ -137,36 +136,42 @@
         .eq('id', user.id)
         .maybeSingle();
 
-      // Check for Google OAuth Provider Token to auto-query YouTube channel
-      const providerToken = session.provider_token;
-      if (providerToken && (!cloudProfile || !cloudProfile.youtube_channel)) {
-        try {
-          ytStatus.textContent = "Detecting YouTube channel from Google token... 🔍";
-          const res = await fetch("https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&mine=true", {
-            headers: { "Authorization": `Bearer ${providerToken}` }
-          });
-          const ytRes = await res.json();
-          if (ytRes.items && ytRes.items.length > 0) {
-            const detectedChannelId = ytRes.items[0].id;
-            const channelTitle = ytRes.items[0].snippet.title;
+      // Check Google Identity
+      const googleIdentity = identities.find(i => i.provider === 'google') || (user.app_metadata.provider === 'google' ? { identity_data: meta } : null);
 
-            // Auto-persist directly into Supabase
-            await supabaseClient.from('profiles').upsert({
-              id: user.id,
-              github_username: ghUsername ? ghUsername.toLowerCase() : null,
-              youtube_channel: detectedChannelId,
-              updated_at: new Date()
-            });
+      if (googleIdentity) {
+        const googleName = (googleIdentity.identity_data && (googleIdentity.identity_data.full_name || googleIdentity.identity_data.name)) || "";
+        
+        // If not yet saved in cloud profile, automatically search and link channel by Google Name
+        if ((!cloudProfile || !cloudProfile.youtube_channel) && googleName) {
+          try {
+            ytStatus.textContent = `Resolving channel for "${googleName}"... 🔍`;
+            const apiKey = getYTKey();
+            const sRes = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(googleName)}&type=channel&maxResults=1&key=${apiKey}`);
+            const sData = await sRes.json();
 
-            manualInput.value = detectedChannelId;
-            ytStatus.textContent = `Detected & Linked: "${channelTitle}" (${detectedChannelId}) ✅`;
-            ytBtn.textContent = "Connected ✅";
-            ytBtn.style.color = "#10b981";
-            ytBtn.style.borderColor = "#10b981";
+            if (sData.items && sData.items.length > 0) {
+              const matchedChannelId = sData.items[0].snippet.channelId;
+              const matchedTitle = sData.items[0].snippet.title;
+
+              await supabaseClient.from('profiles').upsert({
+                id: user.id,
+                github_username: ghUsername ? ghUsername.toLowerCase() : null,
+                youtube_channel: matchedChannelId,
+                updated_at: new Date()
+              });
+
+              manualInput.value = matchedChannelId;
+              ytStatus.textContent = `Auto-linked: "${matchedTitle}" (${matchedChannelId}) ✅`;
+            }
+          } catch (e) {
+            console.warn("Auto channel lookup error:", e);
           }
-        } catch (e) {
-          console.warn("Could not auto-fetch channel from provider token:", e);
         }
+        
+        ytBtn.textContent = "Connected ✅";
+        ytBtn.style.color = "#10b981";
+        ytBtn.style.borderColor = "#10b981";
       }
 
       if (cloudProfile && cloudProfile.youtube_channel) {
@@ -180,7 +185,7 @@
       ytBtn.onclick = () => loginWithGoogle();
       ghBtn.onclick = () => loginWithGitHub();
 
-      // Manual Override / Update
+      // Manual Save Button
       document.getElementById('save-channel-btn').onclick = async () => {
         const chanVal = manualInput.value.trim();
         if (!chanVal) return;
@@ -200,7 +205,7 @@
           linkMsg.textContent = `Error: ${error.message}`;
         } else {
           linkMsg.style.color = "#10b981";
-          linkMsg.textContent = "Profile updated! 📺✨";
+          linkMsg.textContent = "Channel linked successfully! 📺✨";
           ytStatus.textContent = `Linked channel: ${chanVal} ✅`;
         }
       };
