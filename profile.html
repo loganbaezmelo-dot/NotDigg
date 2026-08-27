@@ -21,8 +21,8 @@
       gap: 12px;
     }
     .profile-avatar-lg {
-      width: 80px;
-      height: 80px;
+      width: 90px;
+      height: 90px;
       border-radius: 50%;
       background: linear-gradient(135deg, #2563eb, #ef4444);
       display: flex;
@@ -35,6 +35,7 @@
       box-shadow: 0 4px 14px rgba(0,0,0,0.3);
       background-size: cover;
       background-position: center;
+      border: 2px solid #ef4444;
     }
     .stats-row {
       display: flex;
@@ -112,7 +113,7 @@
 
   </main>
 
-  <script src="app.js?v=32"></script>
+  <script src="app.js?v=40"></script>
   <script>
     const urlParams = new URLSearchParams(window.location.search);
     let targetUser = urlParams.get('user');
@@ -147,10 +148,10 @@
         document.getElementById('owner-actions').style.display = "block";
       }
 
-      loadMergedProfile(cleanTarget);
+      loadMergedProfile(cleanTarget, isOwnProfile);
     }
 
-    async function loadMergedProfile(userHandle) {
+    async function loadMergedProfile(userHandle, isOwnProfile) {
       const avatarEl = document.getElementById('avatar-display');
       const ghStatBox = document.getElementById('gh-stat-box');
       const karmaEl = document.getElementById('karma-count');
@@ -169,6 +170,7 @@
         const ghRes = await fetch(`https://api.github.com/users/${userHandle}`);
         if (ghRes.ok) {
           const ghUser = await ghRes.json();
+          // Initial avatar set from GitHub
           avatarEl.style.backgroundImage = `url('${ghUser.avatar_url}')`;
           avatarEl.textContent = "";
           ghStatBox.style.display = "inline";
@@ -216,7 +218,7 @@
         }
       }
 
-      // 3. Resolve & Render YouTube Channel (1-Unit Optimization)
+      // 3. Resolve & Render YouTube Channel (With Unified Avatar Sync)
       try {
         const apiKey = getYTKey();
         let chanData = null;
@@ -252,9 +254,19 @@
           ytSubEl.textContent = `${Number(chan.statistics.subscriberCount || 0).toLocaleString()} Subs`;
           ytWrapper.style.display = "block";
 
-          if (!avatarEl.style.backgroundImage || avatarEl.style.backgroundImage === 'none') {
-            avatarEl.style.backgroundImage = `url('${chan.snippet.thumbnails.default.url}')`;
+          // UNIFIED AVATAR OVERRIDE: Priority for YouTube channel custom PFP
+          const ytAvatar = chan.snippet.thumbnails.high ? chan.snippet.thumbnails.high.url : chan.snippet.thumbnails.default.url;
+          if (ytAvatar) {
+            avatarEl.style.backgroundImage = `url('${ytAvatar}')`;
             avatarEl.textContent = "";
+
+            if (isOwnProfile) {
+              const navAvatars = document.querySelectorAll('.nav-avatar');
+              navAvatars.forEach(av => {
+                av.style.backgroundImage = `url('${ytAvatar}')`;
+                av.style.backgroundSize = 'cover';
+              });
+            }
           }
 
           // 1-Unit Uploads Playlist Resolution
