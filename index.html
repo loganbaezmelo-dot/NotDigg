@@ -16,8 +16,9 @@
       <a href="index.html" class="logo">notshovel</a>
     </div>
     
-    <div class="nav-right">
-      <a href="profile.html" class="profile-link" title="My Profile / Authenticate">
+    <div class="nav-right" style="display: flex; gap: 8px; align-items: center;">
+      <a href="settings.html" class="icon-btn" title="Settings & Integrations" style="font-size: 16px; text-decoration: none;">⚙️</a>
+      <a href="profile.html" class="profile-link" title="My Profile">
         <div class="nav-avatar"></div>
       </a>
     </div>
@@ -33,13 +34,15 @@
     
     <nav class="drawer-links">
       <a href="index.html" class="drawer-link active">🔥 Top Tech Stories</a>
-      <a href="profile.html" class="drawer-link profile-link">👤 My Profile / Login</a>
+      <a href="profile.html" class="drawer-link profile-link">👤 Unified Profile</a>
+      <a href="settings.html" class="drawer-link">⚙️ Settings & Integrations</a>
+      <a href="login.html" class="drawer-link">🔑 Login / Switch Account</a>
       <a href="https://github.com/loganbaezmelo-dot/NotShovel" target="_blank" rel="noopener noreferrer" class="drawer-link">⭐ View Source</a>
     </nav>
     
     <div class="drawer-footer">
       <p>© 2026 NotShovel</p>
-      <small>Working navigation included 💀</small>
+      <small>All systems operational 🚀</small>
     </div>
   </aside>
 
@@ -72,32 +75,27 @@
 
     <!-- Default Feeds Group -->
     <div id="default-feeds">
-      
-      <!-- Hacker News Top Stories -->
       <header class="feed-header">
         <h1>Top Tech Stories</h1>
         <span class="badge">Live Aggregator</span>
       </header>
       <section id="feed-list" class="feed-list"></section>
 
-      <!-- GitHub Recommendations Section -->
       <header class="feed-header" style="margin-top: 36px;">
         <h1>GitHub Recommendations & Community</h1>
         <span class="badge" style="background-color: rgba(16, 185, 129, 0.2); color: #34d399;">Active Projects</span>
       </header>
       <section id="github-feed-list" class="feed-list"></section>
 
-      <!-- Trending YouTube Tech Videos Section -->
       <header class="feed-header" style="margin-top: 36px;">
         <h1>Trending Tech Videos</h1>
         <span class="badge" style="background-color: rgba(239, 68, 68, 0.2); color: #f87171;">YouTube</span>
       </header>
       <section id="youtube-feed-list" class="feed-list"></section>
-
     </div>
 
   </main>
 
-  <script src="app.js?v=12"></script>
+  <script src="app.js?v=13"></script>
 </body>
 </html>
