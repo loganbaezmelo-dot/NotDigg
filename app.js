@@ -11,11 +11,27 @@ const supabaseClient = window.supabase
   : null;
 
 // 2. Auth Handlers
+async function loginWithGoogle() {
+  if (supabaseClient) {
+    const { error } = await supabaseClient.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: window.location.origin + "/settings.html",
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        }
+      }
+    });
+    if (error) alert("Google Sign-In error: " + error.message);
+  }
+}
+
 async function loginWithGitHub() {
   if (supabaseClient) {
     const { error } = await supabaseClient.auth.signInWithOAuth({
       provider: "github",
-      options: { redirectTo: window.location.origin + "/profile.html" }
+      options: { redirectTo: window.location.origin + "/settings.html" }
     });
     if (error) alert("GitHub OAuth error: " + error.message);
   }
@@ -39,7 +55,7 @@ async function sendMagicLink(email) {
   if (!supabaseClient) return;
   const { data, error } = await supabaseClient.auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: window.location.origin + "/profile.html" }
+    options: { emailRedirectTo: window.location.origin + "/settings.html" }
   });
   if (error) throw error;
   return data;
@@ -55,7 +71,7 @@ async function setupAuthUI() {
     if (session && session.user) {
       const meta = session.user.user_metadata || {};
       activeUser = meta.user_name || meta.preferred_username || session.user.email.split("@")[0];
-      avatarUrl = meta.avatar_url;
+      avatarUrl = meta.avatar_url || meta.picture;
       localStorage.setItem("notshovel_auth_user", activeUser);
     }
   }
@@ -82,7 +98,7 @@ async function setupAuthUI() {
       }
     });
   } else {
-    profileLinks.forEach(link => { link.href = "profile.html"; });
+    profileLinks.forEach(link => { link.href = "login.html"; });
   }
 }
 
@@ -245,7 +261,7 @@ function setupSearch() {
   });
 }
 
-// 5. Tech Stories Loader
+// 5. Stories Loader
 async function loadFeed() {
   const container = document.getElementById("feed-list");
   if (!container) return;
@@ -363,7 +379,7 @@ async function loadGitHubRecommendations() {
   }
 }
 
-// 7. Trending Tech YouTube Loader
+// 7. Trending YouTube Loader
 async function loadTrendingYouTubeVideos() {
   const container = document.getElementById("youtube-feed-list");
   if (!container) return;
