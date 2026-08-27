@@ -112,7 +112,7 @@
 
   </main>
 
-  <script src="app.js?v=25"></script>
+  <script src="app.js?v=32"></script>
   <script>
     const urlParams = new URLSearchParams(window.location.search);
     let targetUser = urlParams.get('user');
@@ -197,7 +197,7 @@
         console.warn("GitHub fetch error:", e);
       }
 
-      // 2. Query Supabase profiles table across multiple possible matches
+      // 2. Query Supabase profiles table
       let channelIdentifier = userHandle;
 
       if (supabaseClient) {
@@ -216,7 +216,7 @@
         }
       }
 
-      // 3. Resolve & Render YouTube Channel
+      // 3. Resolve & Render YouTube Channel (1-Unit Optimization)
       try {
         const apiKey = getYTKey();
         let chanData = null;
@@ -224,14 +224,14 @@
 
         // Strategy A: Direct Channel ID (UC...)
         if (cleanChan.startsWith("UC")) {
-          const res = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${encodeURIComponent(cleanChan)}&key=${apiKey}`);
+          const res = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,contentDetails&id=${encodeURIComponent(cleanChan)}&key=${apiKey}`);
           chanData = await res.json();
         }
 
         // Strategy B: Handle lookup (@...)
         if (!chanData || !chanData.items || chanData.items.length === 0) {
           const handleQuery = cleanChan.startsWith("@") ? cleanChan : `@${cleanChan}`;
-          const res = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&forHandle=${encodeURIComponent(handleQuery)}&key=${apiKey}`);
+          const res = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,contentDetails&forHandle=${encodeURIComponent(handleQuery)}&key=${apiKey}`);
           chanData = await res.json();
         }
 
@@ -241,7 +241,7 @@
           const sData = await sRes.json();
           if (sData.items && sData.items.length > 0) {
             const foundId = sData.items[0].snippet.channelId;
-            const res = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${foundId}&key=${apiKey}`);
+            const res = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,contentDetails&id=${foundId}&key=${apiKey}`);
             chanData = await res.json();
           }
         }
@@ -257,24 +257,34 @@
             avatarEl.textContent = "";
           }
 
-          const vidsRes = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${chan.id}&maxResults=4&order=date&type=video&key=${apiKey}`);
-          const vData = await vidsRes.json();
+          // 1-Unit Uploads Playlist Resolution
+          let uploadsPlaylistId = chan.contentDetails && chan.contentDetails.relatedPlaylists && chan.contentDetails.relatedPlaylists.uploads;
+          if (!uploadsPlaylistId && chan.id.startsWith("UC")) {
+            uploadsPlaylistId = "UU" + chan.id.substring(2);
+          }
 
-          if (vData.items && vData.items.length > 0) {
-            ytContainer.innerHTML = vData.items.map(v => `
-              <article class="card">
-                <a href="video.html?v=${v.id.videoId}" class="card-title">
-                  ▶️ ${v.snippet.title}
-                </a>
-                <p class="card-snippet">${v.snippet.description || "Uploaded video."}</p>
-                <div class="card-footer">
-                  <span>Published ${new Date(v.snippet.publishedAt).toLocaleDateString()}</span>
-                  <a href="video.html?v=${v.id.videoId}" class="meta-link" style="color: #ef4444;">Watch in App →</a>
-                </div>
-              </article>
-            `).join('');
-          } else {
-            ytContainer.innerHTML = `<p style="color: var(--text-muted); text-align: center;">No video uploads found.</p>`;
+          if (uploadsPlaylistId) {
+            const pRes = await fetch(`https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${uploadsPlaylistId}&maxResults=4&key=${apiKey}`);
+            const pData = await pRes.json();
+
+            if (pData.items && pData.items.length > 0) {
+              ytContainer.innerHTML = pData.items
+                .filter(item => item.snippet && item.snippet.resourceId && item.snippet.resourceId.videoId)
+                .map(item => `
+                  <article class="card">
+                    <a href="video.html?v=${item.snippet.resourceId.videoId}" class="card-title">
+                      ▶️ ${item.snippet.title}
+                    </a>
+                    <p class="card-snippet">${item.snippet.description || "Uploaded video."}</p>
+                    <div class="card-footer">
+                      <span>Published ${new Date(item.snippet.publishedAt).toLocaleDateString()}</span>
+                      <a href="video.html?v=${item.snippet.resourceId.videoId}" class="meta-link" style="color: #ef4444;">Watch in App →</a>
+                    </div>
+                  </article>
+                `).join('');
+            } else {
+              ytContainer.innerHTML = `<p style="color: var(--text-muted); text-align: center;">No video uploads found.</p>`;
+            }
           }
         } else {
           ytStatBox.style.display = "none";
