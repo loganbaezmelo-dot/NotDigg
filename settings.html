@@ -96,7 +96,7 @@
     </div>
   </main>
 
-  <script src="app.js?v=16"></script>
+  <script src="app.js?v=17"></script>
   <script>
     async function initSettings() {
       const ytBtn = document.getElementById('connect-yt-btn');
@@ -107,21 +107,24 @@
       const linkMsg = document.getElementById('link-msg');
 
       if (!supabaseClient) return;
-      const { data: { session } } = await supabaseClient.auth.getSession();
 
-      if (!session || !session.user) {
+      // 1. Fetch fresh authenticated user object directly from Supabase server
+      const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+
+      if (!user || userError) {
         window.location.href = "login.html";
         return;
       }
 
-      const user = session.user;
       const meta = user.user_metadata || {};
       const identities = user.identities || [];
 
-      // Extract handles
-      const ghIdentity = identities.find(i => i.provider === 'github');
-      const ghUsername = (ghIdentity && ghIdentity.identity_data && (ghIdentity.identity_data.user_name || ghIdentity.identity_data.preferred_username)) 
-                         || meta.user_name || meta.preferred_username;
+      // Check for GitHub and Google/YouTube identities
+      const ghIdentity = identities.find(i => i.provider === 'github') || (user.app_metadata.provider === 'github' ? { identity_data: meta } : null);
+      const googleIdentity = identities.find(i => i.provider === 'google') || (user.app_metadata.provider === 'google' ? { identity_data: meta } : null);
+
+      let ghUsername = (ghIdentity && ghIdentity.identity_data && (ghIdentity.identity_data.user_name || ghIdentity.identity_data.preferred_username)) 
+                       || meta.user_name || meta.preferred_username;
 
       if (ghUsername) {
         ghStatus.textContent = `Connected as @${ghUsername} ✅`;
@@ -132,16 +135,9 @@
         ghStatus.textContent = "Not connected";
       }
 
-      // Check Cloud Profile
-      const { data: cloudProfile } = await supabaseClient
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
-      if (cloudProfile && cloudProfile.youtube_channel) {
-        manualInput.value = cloudProfile.youtube_channel;
-        ytStatus.textContent = `Linked channel: ${cloudProfile.youtube_channel} (Public) ✅`;
+      if (googleIdentity) {
+        const emailOrName = (googleIdentity.identity_data && (googleIdentity.identity_data.full_name || googleIdentity.identity_data.email)) || user.email;
+        ytStatus.textContent = `Connected via Google (${emailOrName}) ✅`;
         ytBtn.textContent = "Connected ✅";
         ytBtn.style.color = "#10b981";
         ytBtn.style.borderColor = "#10b981";
@@ -149,10 +145,22 @@
         ytStatus.textContent = "Not connected";
       }
 
+      // 2. Check Database Cloud Profile
+      const { data: cloudProfile } = await supabaseClient
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (cloudProfile && cloudProfile.youtube_channel) {
+        manualInput.value = cloudProfile.youtube_channel;
+        ytStatus.textContent = `Linked channel: ${cloudProfile.youtube_channel} (Public) ✅`;
+      }
+
       ytBtn.onclick = () => loginWithGoogle();
       ghBtn.onclick = () => loginWithGitHub();
 
-      // Cloud Upsert
+      // 3. Save to Supabase DB Cloud
       document.getElementById('save-channel-btn').onclick = async () => {
         const chanVal = manualInput.value.trim();
         if (!chanVal) return;
