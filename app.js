@@ -440,7 +440,7 @@ async function loadGitHubRecommendations(limit = 6) {
   }
 }
 
-// 7. Trending YouTube Loader
+// 7. Trending YouTube Loader (Clean Query & Robust Parser)
 async function loadTrendingYouTubeVideos(limit = 5) {
   const container = document.getElementById("youtube-feed-list");
   if (!container) return;
@@ -451,6 +451,11 @@ async function loadTrendingYouTubeVideos(limit = 5) {
     const apiKey = getYTKey();
     const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&q=programming+tech+software+development&type=video&maxResults=${limit}&key=${apiKey}`);
     const data = await res.json();
+
+    if (data.error) {
+      container.innerHTML = `<p style="color: #ef4444; text-align: center;">YouTube API Notice: ${data.error.message} 😭</p>`;
+      return;
+    }
 
     if (data.items && data.items.length > 0) {
       container.innerHTML = data.items.map(v => `
@@ -474,14 +479,14 @@ async function loadTrendingYouTubeVideos(limit = 5) {
         </article>
       `).join("");
     } else {
-      container.innerHTML = `<p style="color: var(--text-muted); text-align: center;">No videos available.</p>`;
+      container.innerHTML = `<p style="color: var(--text-muted); text-align: center;">No videos available right now.</p>`;
     }
   } catch (err) {
     container.innerHTML = `<p style="color: #ef4444; text-align: center;">Failed to load YouTube feed: ${err.message} 😭</p>`;
   }
 }
 
-// 8. Layout Filter System (Takes Over Full Page When Selected)
+// 8. Layout Filter System
 function setupFeedFilters() {
   const pills = document.querySelectorAll(".filter-pill");
   const secStories = document.getElementById("section-stories");
@@ -491,40 +496,33 @@ function setupFeedFilters() {
   if (!pills || pills.length === 0) return;
 
   pills.forEach(pill => {
-    pill.addEventListener("click", () => {
+    pill.onclick = () => {
       pills.forEach(p => p.classList.remove("active"));
       pill.classList.add("active");
 
       const filter = pill.getAttribute("data-filter");
 
       if (filter === "all") {
-        // Normal mixed layout
-        secStories.style.display = "block";
-        secGithub.style.display = "block";
-        secYoutube.style.display = "block";
-        loadFeed(10);
-        loadGitHubRecommendations(6);
-        loadTrendingYouTubeVideos(5);
+        if (secStories) secStories.style.display = "block";
+        if (secGithub) secGithub.style.display = "block";
+        if (secYoutube) secYoutube.style.display = "block";
       } else if (filter === "stories") {
-        // Expand stories to take over full page
-        secStories.style.display = "block";
-        secGithub.style.display = "none";
-        secYoutube.style.display = "none";
+        if (secStories) secStories.style.display = "block";
+        if (secGithub) secGithub.style.display = "none";
+        if (secYoutube) secYoutube.style.display = "none";
         loadFeed(25);
       } else if (filter === "github") {
-        // Expand GitHub to take over full page
-        secStories.style.display = "none";
-        secGithub.style.display = "block";
-        secYoutube.style.display = "none";
+        if (secStories) secStories.style.display = "none";
+        if (secGithub) secGithub.style.display = "block";
+        if (secYoutube) secYoutube.style.display = "none";
         loadGitHubRecommendations(20);
       } else if (filter === "youtube") {
-        // Expand YouTube to take over full page
-        secStories.style.display = "none";
-        secGithub.style.display = "none";
-        secYoutube.style.display = "block";
+        if (secStories) secStories.style.display = "none";
+        if (secGithub) secGithub.style.display = "none";
+        if (secYoutube) secYoutube.style.display = "block";
         loadTrendingYouTubeVideos(20);
       }
-    });
+    };
   });
 }
 
