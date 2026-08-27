@@ -182,6 +182,7 @@ function setupSearch() {
   const defaultFeeds = document.getElementById("default-feeds");
   const clearBtn = document.getElementById("clear-search-btn");
   const title = document.getElementById("search-header-title");
+  const filterBar = document.getElementById("filter-bar");
 
   if (!form || !input) return;
 
@@ -189,6 +190,7 @@ function setupSearch() {
     input.value = "";
     resultsSection.style.display = "none";
     defaultFeeds.style.display = "block";
+    if (filterBar) filterBar.style.display = "flex";
   }
 
   if (clearBtn) clearBtn.onclick = resetSearch;
@@ -201,6 +203,7 @@ function setupSearch() {
     const cleanHandle = rawQuery.replace(/^@/, "").trim();
     const apiKey = getYTKey();
 
+    if (filterBar) filterBar.style.display = "none";
     defaultFeeds.style.display = "none";
     resultsSection.style.display = "block";
     title.textContent = `Search: "${rawQuery}"`;
@@ -320,7 +323,7 @@ function setupSearch() {
 }
 
 // 5. Tech Stories Loader
-async function loadFeed() {
+async function loadFeed(limit = 10) {
   const container = document.getElementById("feed-list");
   if (!container) return;
 
@@ -329,7 +332,7 @@ async function loadFeed() {
   try {
     const res = await fetch("https://hacker-news.firebaseio.com/v0/topstories.json");
     const storyIds = await res.json();
-    const topIds = storyIds.slice(0, 10);
+    const topIds = storyIds.slice(0, limit);
 
     const storyPromises = topIds.map(id =>
       fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`).then(r => r.json())
@@ -365,7 +368,7 @@ async function loadFeed() {
 }
 
 // 6. Dynamic GitHub Repos Loader
-async function loadGitHubRecommendations() {
+async function loadGitHubRecommendations(limit = 6) {
   const container = document.getElementById("github-feed-list");
   if (!container) return;
 
@@ -377,20 +380,20 @@ async function loadGitHubRecommendations() {
 
     if (activeUser) {
       try {
-        const userRepoRes = await fetch(`https://api.github.com/users/${activeUser}/repos?sort=pushed&per_page=1`);
+        const userRepoRes = await fetch(`https://api.github.com/users/${activeUser}/repos?sort=pushed&per_page=2`);
         if (userRepoRes.ok) {
           const userRepos = await userRepoRes.json();
-          if (Array.isArray(userRepos) && userRepos.length > 0) {
-            feedRepos.push(userRepos[0]);
+          if (Array.isArray(userRepos)) {
+            feedRepos.push(...userRepos);
           }
         }
       } catch (err) {
-        console.warn("Could not fetch active user repo", err);
+        console.warn("Could not fetch user repos", err);
       }
     }
 
     const searchRes = await fetch(
-      "https://api.github.com/search/repositories?q=stars:>100+pushed:>2026-01-01&sort=stars&order=desc&per_page=6"
+      `https://api.github.com/search/repositories?q=stars:>100+pushed:>2026-01-01&sort=stars&order=desc&per_page=${limit + 4}`
     );
 
     if (searchRes.ok) {
@@ -398,7 +401,7 @@ async function loadGitHubRecommendations() {
       const trending = (searchData.items || []).filter(
         repo => !feedRepos.some(existing => existing.id === repo.id)
       );
-      feedRepos = [...feedRepos, ...trending].slice(0, 6);
+      feedRepos = [...feedRepos, ...trending].slice(0, limit);
     }
 
     if (feedRepos.length === 0) {
@@ -437,8 +440,8 @@ async function loadGitHubRecommendations() {
   }
 }
 
-// 7. Trending YouTube Loader (Fixed Search Relevancy Endpoint)
-async function loadTrendingYouTubeVideos() {
+// 7. Trending YouTube Loader
+async function loadTrendingYouTubeVideos(limit = 5) {
   const container = document.getElementById("youtube-feed-list");
   if (!container) return;
 
@@ -446,7 +449,7 @@ async function loadTrendingYouTubeVideos() {
 
   try {
     const apiKey = getYTKey();
-    const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&q=programming+tech+software+development&type=video&maxResults=5&key=${apiKey}`);
+    const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&q=programming+tech+software+development&type=video&maxResults=${limit}&key=${apiKey}`);
     const data = await res.json();
 
     if (data.items && data.items.length > 0) {
@@ -478,11 +481,59 @@ async function loadTrendingYouTubeVideos() {
   }
 }
 
+// 8. Layout Filter System (Takes Over Full Page When Selected)
+function setupFeedFilters() {
+  const pills = document.querySelectorAll(".filter-pill");
+  const secStories = document.getElementById("section-stories");
+  const secGithub = document.getElementById("section-github");
+  const secYoutube = document.getElementById("section-youtube");
+
+  if (!pills || pills.length === 0) return;
+
+  pills.forEach(pill => {
+    pill.addEventListener("click", () => {
+      pills.forEach(p => p.classList.remove("active"));
+      pill.classList.add("active");
+
+      const filter = pill.getAttribute("data-filter");
+
+      if (filter === "all") {
+        // Normal mixed layout
+        secStories.style.display = "block";
+        secGithub.style.display = "block";
+        secYoutube.style.display = "block";
+        loadFeed(10);
+        loadGitHubRecommendations(6);
+        loadTrendingYouTubeVideos(5);
+      } else if (filter === "stories") {
+        // Expand stories to take over full page
+        secStories.style.display = "block";
+        secGithub.style.display = "none";
+        secYoutube.style.display = "none";
+        loadFeed(25);
+      } else if (filter === "github") {
+        // Expand GitHub to take over full page
+        secStories.style.display = "none";
+        secGithub.style.display = "block";
+        secYoutube.style.display = "none";
+        loadGitHubRecommendations(20);
+      } else if (filter === "youtube") {
+        // Expand YouTube to take over full page
+        secStories.style.display = "none";
+        secGithub.style.display = "none";
+        secYoutube.style.display = "block";
+        loadTrendingYouTubeVideos(20);
+      }
+    });
+  });
+}
+
 // Init
 document.addEventListener("DOMContentLoaded", () => {
   setupSidebar();
   setupAuthUI();
   setupSearch();
+  setupFeedFilters();
   loadFeed();
   loadGitHubRecommendations();
   loadTrendingYouTubeVideos();
