@@ -178,7 +178,7 @@
 
   </main>
 
-  <script src="app.js?v=9"></script>
+  <script src="app.js?v=11"></script>
   <script>
     const urlParams = new URLSearchParams(window.location.search);
     let targetUser = urlParams.get('user');
@@ -189,7 +189,6 @@
       const subArea = document.getElementById('submissions-area');
       const statusEl = document.getElementById('auth-status');
 
-      // Check current Supabase session
       let sessionUser = null;
       if (supabaseClient) {
         const { data: { session } } = await supabaseClient.auth.getSession();
@@ -214,7 +213,6 @@
         loadUserDetails(targetUser);
       }
 
-      // Event Listeners
       document.getElementById('github-auth-btn').onclick = () => loginWithGitHub();
 
       document.getElementById('email-login-btn').onclick = async () => {
@@ -286,7 +284,7 @@
 
       document.getElementById('username').textContent = `@${userHandle}`;
 
-      // 1. Fetch GitHub Information & Repositories
+      // 1. Fetch GitHub Repos (Routed strictly internally)
       try {
         const ghRes = await fetch(`https://api.github.com/users/${userHandle}`);
         if (ghRes.ok) {
@@ -310,13 +308,13 @@
             reposWrapper.style.display = "block";
             reposContainer.innerHTML = repos.map(repo => `
               <article class="card">
-                <a href="${repo.html_url}" target="_blank" rel="noopener noreferrer" class="card-title">
+                <a href="repo.html?owner=${encodeURIComponent(userHandle)}&repo=${encodeURIComponent(repo.name)}" class="card-title">
                   📦 ${repo.name}
                 </a>
                 <p class="card-snippet">${repo.description || "No repository description provided."}</p>
                 <div class="card-footer">
                   <span>⭐ ${repo.stargazers_count} stars • 🍴 ${repo.forks_count} forks</span>
-                  <a href="${repo.html_url}" target="_blank" class="meta-link">View on GitHub →</a>
+                  <a href="repo.html?owner=${encodeURIComponent(userHandle)}&repo=${encodeURIComponent(repo.name)}" class="meta-link">Read Project →</a>
                 </div>
               </article>
             `).join('');
@@ -326,13 +324,12 @@
         console.warn("GitHub lookup error:", e);
       }
 
-      // 2. Fetch Hacker News Submissions (runs for EVERY profile)
+      // 2. Fetch Hacker News Submissions
       try {
         const res = await fetch(`https://hacker-news.firebaseio.com/v0/user/${userHandle}.json`);
         const user = await res.json();
 
         if (user) {
-          // If avatar/bio weren't filled by GitHub, fill with HN info
           if (!avatarEl.style.backgroundImage || avatarEl.style.backgroundImage === 'none') {
             avatarEl.textContent = userHandle.slice(0, 2).toUpperCase();
             statLabel1.textContent = "Karma";
