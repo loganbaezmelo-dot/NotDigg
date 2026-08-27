@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Video Player | NotShovel</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .video-container {
+      position: relative;
+      width: 100%;
+      padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
+      height: 0;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #000;
+      margin-top: 15px;
+      border: 1px solid var(--border-color);
+    }
+    .video-container iframe {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+    .video-details-card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 18px;
+      margin-top: 15px;
+    }
+    .channel-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border-color);
+    }
+    .channel-avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background-size: cover;
+      background-position: center;
+      background-color: #333;
+    }
+  </style>
+</head>
+<body>
+
+  <header class="navbar">
+    <div class="nav-left">
+      <a href="index.html" class="logo">notshovel</a>
+    </div>
+    <div class="nav-right">
+      <a href="index.html" class="meta-link" style="color: white;">← Back to feed</a>
+    </div>
+  </header>
+
+  <main class="container">
+    
+    <!-- Embedded Video Frame -->
+    <div class="video-container">
+      <iframe id="video-frame" src="" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
+    </div>
+
+    <!-- Video Info Card -->
+    <section class="video-details-card">
+      <h1 id="video-title" style="font-size: 18px; font-weight: 700; color: #fff;">Loading video...</h1>
+      
+      <div class="stats-row" id="video-metrics" style="display: flex; gap: 16px; margin-top: 8px; font-size: 13px; color: var(--text-muted);">
+        <span>👁️ <strong id="view-count" style="color: #fff;">--</strong> views</span>
+        <span>👍 <strong id="like-count" style="color: #fff;">--</strong> likes</span>
+        <span>💬 <strong id="comment-count" style="color: #fff;">--</strong> comments</span>
+        <span id="published-date">--</span>
+      </div>
+
+      <div class="channel-row">
+        <div class="channel-avatar" id="channel-thumb"></div>
+        <div>
+          <a id="channel-name-link" href="#" class="meta-link" style="font-weight: 700; font-size: 15px; color: #fff;">Loading channel...</a>
+          <p id="subscriber-count" style="font-size: 12px; color: var(--text-muted); margin: 0;"></p>
+        </div>
+      </div>
+
+      <p id="video-desc" class="card-snippet" style="margin-top: 14px; font-size: 13.5px; line-height: 1.6; white-space: pre-line; color: #d1d5db;"></p>
+    </section>
+
+  </main>
+
+  <script>
+    const YT_KEY = "AIzaSyDRUCdSjUO1KzLQh5aC3n6_62OAxplI4Q8";
+    const urlParams = new URLSearchParams(window.location.search);
+    const videoId = urlParams.get('v');
+
+    async function loadVideoDetails() {
+      if (!videoId) return;
+
+      document.getElementById('video-frame').src = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+
+      try {
+        const res = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${videoId}&key=${YT_KEY}`);
+        const data = await res.json();
+
+        if (data.items && data.items.length > 0) {
+          const item = data.items[0];
+          const snip = item.snippet;
+          const stats = item.statistics;
+
+          document.getElementById('video-title').textContent = snip.title;
+          document.getElementById('view-count').textContent = Number(stats.viewCount || 0).toLocaleString();
+          document.getElementById('like-count').textContent = Number(stats.likeCount || 0).toLocaleString();
+          document.getElementById('comment-count').textContent = Number(stats.commentCount || 0).toLocaleString();
+          document.getElementById('published-date').textContent = new Date(snip.publishedAt).toLocaleDateString();
+          document.getElementById('video-desc').textContent = snip.description || "No description provided.";
+
+          // Load Channel Info
+          const chanRes = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${snip.channelId}&key=${YT_KEY}`);
+          const chanData = await chanRes.json();
+          if (chanData.items && chanData.items.length > 0) {
+            const chan = chanData.items[0];
+            document.getElementById('channel-thumb').style.backgroundImage = `url('${chan.snippet.thumbnails.default.url}')`;
+            const chanLink = document.getElementById('channel-name-link');
+            chanLink.textContent = chan.snippet.title;
+            chanLink.href = `channel.html?id=${chan.id}`;
+            document.getElementById('subscriber-count').textContent = `${Number(chan.statistics.subscriberCount || 0).toLocaleString()} subscribers`;
+          }
+        }
+      } catch (err) {
+        document.getElementById('video-title').textContent = "Failed to load video information.";
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadVideoDetails);
+  </script>
+</body>
+</html>
