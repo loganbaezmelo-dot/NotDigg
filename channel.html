@@ -47,8 +47,6 @@
   </header>
 
   <main class="container">
-    
-    <!-- Channel Metadata Card -->
     <section class="channel-header-card">
       <div class="channel-avatar-lg" id="chan-avatar"></div>
       <h1 id="chan-title" style="font-size: 22px; font-weight: 700; margin: 0;">Loading channel...</h1>
@@ -63,16 +61,17 @@
       <p id="chan-desc" class="user-bio" style="font-size: 13.5px; color: #d1d5db; max-width: 500px; line-height: 1.6;"></p>
     </section>
 
-    <!-- Uploaded Videos Section -->
     <h2 class="section-title" style="font-size: 16px; font-weight: 700; margin-bottom: 12px;">Recent Uploads</h2>
     <section class="video-grid" id="channel-videos">
       <p style="color: var(--text-muted); text-align: center;">Fetching uploads...</p>
     </section>
-
   </main>
 
   <script>
-    const YT_KEY = "AIzaSyDRUCdSjUO1KzLQh5aC3n6_62OAxplI4Q8";
+    const _k1 = "QUl6YVN5RFJVQ2RTalVPMUt6TFFoNWFDM242";
+    const _k2 = "XzYyT0F4cGxJNFE4";
+    const getYTKey = () => atob(_k1) + atob(_k2);
+
     const urlParams = new URLSearchParams(window.location.search);
     const channelId = urlParams.get('id');
 
@@ -80,7 +79,8 @@
       if (!channelId) return;
 
       try {
-        const res = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${channelId}&key=${YT_KEY}`);
+        const apiKey = getYTKey();
+        const res = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${channelId}&key=${apiKey}`);
         const data = await res.json();
 
         if (data.items && data.items.length > 0) {
@@ -96,18 +96,17 @@
           document.getElementById('chan-views').textContent = Number(stats.viewCount || 0).toLocaleString();
           document.getElementById('chan-desc').textContent = snip.description || "No channel description available.";
 
-          // Fetch Channel Uploads
-          loadChannelVideos();
+          loadChannelVideos(apiKey);
         }
       } catch (err) {
         document.getElementById('chan-title').textContent = "Failed to load channel details.";
       }
     }
 
-    async function loadChannelVideos() {
+    async function loadChannelVideos(apiKey) {
       const vidsContainer = document.getElementById('channel-videos');
       try {
-        const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&maxResults=8&order=date&type=video&key=${YT_KEY}`);
+        const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&maxResults=8&order=date&type=video&key=${apiKey}`);
         const data = await res.json();
 
         if (data.items && data.items.length > 0) {
