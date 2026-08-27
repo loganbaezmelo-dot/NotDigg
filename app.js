@@ -6,7 +6,7 @@ const supabaseClient = window.supabase
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
 
-// 2. Auth Handlers (GitHub & Email)
+// 2. Auth Handlers
 async function loginWithGitHub() {
   if (supabaseClient) {
     const { error } = await supabaseClient.auth.signInWithOAuth({
@@ -21,20 +21,14 @@ async function loginWithGitHub() {
 
 async function loginWithEmail(email, password) {
   if (!supabaseClient) return;
-  const { data, error } = await supabaseClient.auth.signInWithPassword({
-    email,
-    password
-  });
+  const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
   if (error) throw error;
   return data;
 }
 
 async function signUpWithEmail(email, password) {
   if (!supabaseClient) return;
-  const { data, error } = await supabaseClient.auth.signUp({
-    email,
-    password
-  });
+  const { data, error } = await supabaseClient.auth.signUp({ email, password });
   if (error) throw error;
   return data;
 }
@@ -43,9 +37,7 @@ async function sendMagicLink(email) {
   if (!supabaseClient) return;
   const { data, error } = await supabaseClient.auth.signInWithOtp({
     email,
-    options: {
-      emailRedirectTo: window.location.origin + "/profile.html"
-    }
+    options: { emailRedirectTo: window.location.origin + "/profile.html" }
   });
   if (error) throw error;
   return data;
@@ -108,7 +100,7 @@ function setupSidebar() {
   if (backdrop) backdrop.addEventListener("click", closeDrawer);
 }
 
-// 5. Feed Loader
+// 5. Live Tech Stories Loader
 async function loadFeed() {
   const container = document.getElementById("feed-list");
   if (!container) return;
@@ -118,7 +110,7 @@ async function loadFeed() {
   try {
     const res = await fetch("https://hacker-news.firebaseio.com/v0/topstories.json");
     const storyIds = await res.json();
-    const topIds = storyIds.slice(0, 15);
+    const topIds = storyIds.slice(0, 10);
 
     const storyPromises = topIds.map(id =>
       fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`).then(r => r.json())
@@ -153,9 +145,62 @@ async function loadFeed() {
   }
 }
 
-// Init
+// 6. GitHub Recommendations & Logged-In User Repos Loader
+async function loadGitHubRecommendations() {
+  const container = document.getElementById("github-feed-list");
+  if (!container) return;
+
+  container.innerHTML = `<p style="color: #9ca3af; text-align: center;">Fetching GitHub spotlight repos... 📦</p>`;
+
+  try {
+    let spotlightUsers = ["loganbaezmelo-dot", "torvalds", "facebook", "vercel"];
+    const activeUser = localStorage.getItem("notshovel_auth_user");
+    
+    // Put current authenticated user right at the very front of the list
+    if (activeUser && !spotlightUsers.includes(activeUser)) {
+      spotlightUsers.unshift(activeUser);
+    }
+
+    const repoPromises = spotlightUsers.slice(0, 3).map(user =>
+      fetch(`https://api.github.com/users/${user}/repos?sort=pushed&per_page=2`)
+        .then(r => r.ok ? r.json() : [])
+        .catch(() => [])
+    );
+
+    const repoResults = await Promise.all(repoPromises);
+    const allRepos = repoResults.flat().filter(r => r && r.name);
+
+    if (allRepos.length === 0) {
+      container.innerHTML = `<p style="color: var(--text-muted); text-align: center;">No repos found.</p>`;
+      return;
+    }
+
+    container.innerHTML = allRepos.map(repo => `
+      <article class="card">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <img src="${repo.owner.avatar_url}" alt="${repo.owner.login}" style="width: 22px; height: 22px; border-radius: 50%;" />
+          <a href="profile.html?user=${repo.owner.login}" class="meta-link" style="font-weight: 600;">@${repo.owner.login}</a>
+        </div>
+        <a href="${repo.html_url}" target="_blank" rel="noopener noreferrer" class="card-title">
+          📦 ${repo.name}
+        </a>
+        <p class="card-snippet">${repo.description || "Open source project on GitHub."}</p>
+        <div class="card-footer">
+          <span>⭐ ${repo.stargazers_count} stars • 🍴 ${repo.forks_count} forks</span>
+          <a href="${repo.html_url}" target="_blank" rel="noopener noreferrer" class="meta-link">View Repo ↗</a>
+        </div>
+      </article>
+    `).join("");
+
+  } catch (err) {
+    container.innerHTML = `<p style="color: #ef4444; text-align: center;">Failed to load GitHub repos 😭💀</p>`;
+  }
+}
+
+// Init on DOM Ready
 document.addEventListener("DOMContentLoaded", () => {
   setupSidebar();
   setupAuthUI();
   loadFeed();
+  loadGitHubRecommendations();
 });
