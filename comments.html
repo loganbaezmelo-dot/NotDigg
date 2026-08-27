@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Discussion | NotShovel</title>
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     .comment {
       background-color: var(--bg-card);
@@ -54,10 +55,10 @@
     </div>
 
     <section id="comments-list">
-      <!-- Comments inject here -->
-    </section>
+      </section>
   </main>
 
+  <script src="app.js?v=7"></script>
   <script>
     const urlParams = new URLSearchParams(window.location.search);
     const storyId = urlParams.get('id');
